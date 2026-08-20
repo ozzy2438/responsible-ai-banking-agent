@@ -127,7 +127,13 @@ class BankingService:
         response = AssistResponse(
             request_id=request_id,
             risk_level=assessment.level,
-            disposition=Disposition.ESCALATED if escalated else Disposition.ANSWERED,
+            disposition=(
+                Disposition.ESCALATED
+                if escalated
+                else Disposition.ANSWERED
+                if facts
+                else Disposition.NEEDS_INFORMATION
+            ),
             answer=draft.answer,
             verified_facts=facts,
             citations=[fact.citation for fact in facts],

@@ -3,8 +3,17 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from responsible_banking_agent.models import Actor, AssistRequest, AssistResponse, Role
+from responsible_banking_agent.models import (
+    Actor,
+    AssistRequest,
+    AssistResponse,
+    ReasoningDraft,
+    RiskAssessment,
+    Role,
+    VerifiedFact,
+)
 from responsible_banking_agent.policies import PolicyStore
+from responsible_banking_agent.reasoning.openai_adapter import ProviderOutputError
 from responsible_banking_agent.reasoning.stub import DeterministicStub
 from responsible_banking_agent.repository import AccountRecord, TransactionRecord
 from responsible_banking_agent.service import BankingService
@@ -98,3 +107,20 @@ def test_authorised_transaction_is_returned_with_its_own_citation() -> None:
     )
     assert response.risk_level.value == "MEDIUM"
     assert any(citation.source_type == "transaction" for citation in response.citations)
+
+
+class FailingProvider:
+    def draft(
+        self, message: str, assessment: RiskAssessment, facts: list[VerifiedFact]
+    ) -> ReasoningDraft:
+        del message, assessment, facts
+        raise ProviderOutputError("mock provider failure")
+
+
+def test_provider_failure_uses_safe_deterministic_fallback() -> None:
+    service = BankingService(MemoryRepository(), PolicyStore(Path("policies")), FailingProvider())
+    response = service.assist(
+        _actor(), AssistRequest(message="What are branch opening hours?"), str(uuid4())
+    )
+    assert response.disposition.value == "answered"
+    assert response.citations

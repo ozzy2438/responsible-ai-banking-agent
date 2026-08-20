@@ -8,7 +8,7 @@ class DeterministicStub:
         self, message: str, assessment: RiskAssessment, facts: list[VerifiedFact]
     ) -> ReasoningDraft:
         del message
-        if assessment.level is RiskLevel.HIGH:
+        if assessment.level is RiskLevel.HIGH or assessment.route is not None:
             return ReasoningDraft(
                 answer="This request needs review by an authorised banking specialist.",
                 uncertainty=["No autonomous decision has been made."],

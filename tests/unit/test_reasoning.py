@@ -36,6 +36,20 @@ class FakeClient:
         self.responses = FakeResponses(output)
 
 
+class ErrorResponses:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
+    def create(self, **kwargs: object) -> object:
+        del kwargs
+        raise self.error
+
+
+class ErrorClient:
+    def __init__(self, error: Exception) -> None:
+        self.responses = ErrorResponses(error)
+
+
 def test_openai_adapter_uses_strict_schema_and_store_false() -> None:
     output = json.dumps(
         {
@@ -65,6 +79,22 @@ def test_openai_adapter_rejects_unapproved_citation() -> None:
     )
     with pytest.raises(ProviderOutputError):
         OpenAIResponsesAdapter("explicit-model", FakeClient(output)).draft(
+            "question", RiskAssessment(level=RiskLevel.LOW, reason_codes=["general"]), [_fact()]
+        )
+
+
+@pytest.mark.parametrize("output", ["", "{}", "not-json"])
+def test_openai_adapter_rejects_refusal_or_invalid_schema(output: str) -> None:
+    with pytest.raises(ProviderOutputError):
+        OpenAIResponsesAdapter("explicit-model", FakeClient(output)).draft(
+            "question", RiskAssessment(level=RiskLevel.LOW, reason_codes=["general"]), [_fact()]
+        )
+
+
+@pytest.mark.parametrize("error", [TimeoutError("timeout"), ConnectionError("provider error")])
+def test_openai_adapter_wraps_provider_failure(error: Exception) -> None:
+    with pytest.raises(ProviderOutputError, match="Provider request failed"):
+        OpenAIResponsesAdapter("explicit-model", ErrorClient(error)).draft(
             "question", RiskAssessment(level=RiskLevel.LOW, reason_codes=["general"]), [_fact()]
         )
 

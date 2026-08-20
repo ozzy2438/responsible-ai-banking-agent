@@ -59,6 +59,8 @@ class OpenAIResponsesAdapter:
             draft = ReasoningDraft.model_validate_json(response.output_text)
         except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
             raise ProviderOutputError("Provider returned invalid structured output") from exc
+        except Exception as exc:
+            raise ProviderOutputError("Provider request failed") from exc
         if not set(draft.citation_source_ids).issubset(allowed_ids):
             raise ProviderOutputError("Provider cited an unapproved source")
         return draft

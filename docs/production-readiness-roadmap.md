@@ -84,6 +84,10 @@ production build; an independent auth review has signed off the adapter.
 
 All account, transaction, and policy data today are synthetic fixtures with a
 committed manifest hash ([`docs/policy-source-register.md`](policy-source-register.md)).
+A larger, deterministic synthetic dataset now exists
+([`docs/synthetic-data.md`](synthetic-data.md)) for engineering confidence and
+demos at scale — it strengthens this stage's testing but does not close it: a
+bigger synthetic dataset is still synthetic, not an approved real data source.
 
 **Engineering work this repo can do:**
 - Keep the same evidence-retrieval contract (deterministic selection,

@@ -88,7 +88,9 @@ See [the system card](docs/system-card.md),
 [delivery controls](docs/delivery.md) for CI jobs, RC publication, SBOM, and
 attestation verification. See the
 [production readiness roadmap](docs/production-readiness-roadmap.md) for what
-remains between this reference candidate and any real deployment.
+remains between this reference candidate and any real deployment, and
+[synthetic data](docs/synthetic-data.md) for the bulk seed dataset used for
+local development, demos, and stress testing.
 
 ## Evidence language
 

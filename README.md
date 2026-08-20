@@ -83,7 +83,9 @@ make test
 
 See [the system card](docs/system-card.md),
 [architecture](docs/architecture.md), and
-[threat model](docs/threat-model.md) for the controlled scope.
+[threat model](docs/threat-model.md) for the controlled scope. See
+[delivery controls](docs/delivery.md) for CI jobs, RC publication, SBOM, and
+attestation verification.
 
 ## Evidence language
 

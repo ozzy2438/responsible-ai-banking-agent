@@ -35,13 +35,51 @@ The default reasoning provider is a deterministic stub. An optional OpenAI
 Responses API adapter may improve wording from redacted and authorised evidence,
 but it cannot lower risk, widen access, choose tools, or change disposition.
 
-## Planned local stack
+## Local stack
 
 - Python 3.12, FastAPI, Pydantic, Jinja2
 - PostgreSQL 16 with separate migration and restricted application roles
 - synthetic fixtures and versioned policy documents
 - Docker and GitHub Actions
 - private GHCR pre-release images with provenance and SBOM attestations
+
+## Run locally
+
+Python 3.12 and Docker are required. The local database and identities contain
+synthetic data only.
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/pip install -e ".[test]"
+make identities
+docker compose up -d postgres
+```
+
+Copy `.env.example` values into your shell, then run:
+
+```sh
+.venv/bin/python -m responsible_banking_agent.database
+.venv/bin/python -m uvicorn responsible_banking_agent.app:create_app \
+  --factory --host 127.0.0.1 --port 8000
+```
+
+`POST /dev/login` is deliberately available only in `local` and `test`
+environments. Bearer tokens generated in `.local/identities.json` are for local
+testing and are ignored by Git. Non-local startup rejects simulated identity.
+
+The optional OpenAI adapter is disabled by default. Enabling it requires
+`REASONING_PROVIDER=openai`, an explicit `OPENAI_MODEL`, and
+`OPENAI_API_KEY`. It receives only redacted, authorised facts, requests strict
+structured output with storage disabled, and cannot alter classification,
+authorisation, or escalation. Automated tests never make live model calls.
+
+## Verify
+
+```sh
+make lint
+make typecheck
+make test
+```
 
 See [the system card](docs/system-card.md),
 [architecture](docs/architecture.md), and

@@ -14,8 +14,13 @@ dependencies = [
   "openai>=2.0,<3",
   "psycopg[binary]>=3.2,<4",
   "pydantic>=2.11,<3",
+  "python-multipart>=0.0.20,<1",
   "uvicorn>=0.35,<1",
 ]
+
+[project.scripts]
+banking-agent-migrate = "responsible_banking_agent.database:main"
+banking-agent-identities = "responsible_banking_agent.identity:main"
 
 [project.optional-dependencies]
 test = [

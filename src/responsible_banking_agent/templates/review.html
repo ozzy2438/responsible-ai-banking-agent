@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Human review queue</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 70rem; margin: 2rem auto; padding: 0 1rem; }
+      article { border: 1px solid #bbb; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+      label { display: block; margin-top: .5rem; }
+      input, select, button { font: inherit; padding: .4rem; }
+      .warning { background: #fff4d6; padding: .8rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Human review queue</h1>
+    <p class="warning">Synthetic reference data only. This console cannot execute banking actions.</p>
+    <p>Signed in as {{ actor.display_name }} ({{ actor.role.value }}).</p>
+    {% for item in items %}
+      <article>
+        <h2>{{ item.route }} — {{ item.status }}</h2>
+        <p>{{ item.summary }}</p>
+        <p>Redacted request: {{ item.redacted_message }}</p>
+        <form method="post" action="/review/escalations/{{ item.id }}/actions">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <label>Action
+            <select name="action">
+              <option value="acknowledge">Acknowledge</option>
+              <option value="route">Route</option>
+              <option value="close">Close</option>
+            </select>
+          </label>
+          <label>Route
+            <select name="route">
+              <option value="">None</option>
+              <option value="customer_service">Customer service</option>
+              <option value="complaints">Complaints</option>
+              <option value="fraud_operations">Fraud operations</option>
+              <option value="hardship">Hardship</option>
+              <option value="lending_specialist">Lending specialist</option>
+              <option value="legal_compliance">Legal/compliance</option>
+            </select>
+          </label>
+          <label>Reason <input name="reason" minlength="3" maxlength="500" required></label>
+          <button type="submit">Record controlled action</button>
+        </form>
+      </article>
+    {% else %}
+      <p>No open escalation records.</p>
+    {% endfor %}
+  </body>
+</html>

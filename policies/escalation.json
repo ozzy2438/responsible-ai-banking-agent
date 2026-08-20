@@ -1,0 +1,12 @@
+{
+  "policy_id": "POL-ESCALATE-001",
+  "version": "1.0.0",
+  "sections": [
+    {
+      "section_id": "human-review",
+      "title": "Human review",
+      "text": "Credit, fraud, hardship, legal, advice, unusual-transaction, and policy-exception matters require an authorised human workflow.",
+      "keywords": ["loan", "fraud", "hardship", "legal", "advice", "unusual", "exception"]
+    }
+  ]
+}

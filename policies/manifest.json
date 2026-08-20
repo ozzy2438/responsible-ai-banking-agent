@@ -1,0 +1,8 @@
+{
+  "bundle_version": "1.0.0",
+  "files": {
+    "escalation.json": "a4369ce08fc0a0fb71db0c9ab5dca016bb7a54ce2b2d0610f867986067c89600",
+    "general.json": "f39f6e7133afb49d010ac692de196768cf16041854e5a372f67d1bbccce03e86",
+    "security.json": "a0a5e26dfee20cef6fb1d4925c155e29bc644964b1f0048b67a2ef6ba4a258b3"
+  }
+}

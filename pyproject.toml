@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "responsible-ai-banking-agent"
+version = "0.1.0rc1"
+description = "Synthetic human-supervised responsible AI banking reference app"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "jinja2>=3.1,<4",
+  "openai>=2.0,<3",
+  "psycopg[binary]>=3.2,<4",
+  "pydantic>=2.11,<3",
+  "python-multipart>=0.0.20,<1",
+  "uvicorn>=0.35,<1",
+]
+
+[project.scripts]
+banking-agent-migrate = "responsible_banking_agent.database:main"
+banking-agent-identities = "responsible_banking_agent.identity:main"
+
+[project.optional-dependencies]
+test = [
+  "bandit>=1.8,<2",
+  "httpx>=0.28,<1",
+  "mypy>=1.17,<2",
+  "pip-audit>=2.9,<3",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.2,<8",
+  "ruff>=0.12,<1",
+  "types-psycopg2>=2.9,<3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/responsible_banking_agent"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"policies" = "responsible_banking_agent/policies"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers"
+testpaths = ["tests"]
+markers = ["integration: requires PostgreSQL 16"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["responsible_banking_agent"]

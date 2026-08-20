@@ -1,0 +1,134 @@
+name: Release candidate
+
+on:
+  push:
+    tags:
+      - v0.1.0-rc.1
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: Re-run blocking gates
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    name: Publish private GHCR candidate
+    needs: gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Enforce the authorised release candidate tag
+        shell: bash
+        run: test "$GITHUB_REF_NAME" = "v0.1.0-rc.1"
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Define immutable tags and OCI labels
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=0.1.0-rc.1
+            type=raw,value=sha-${{ github.sha }}
+      - name: Build and push candidate
+        id: push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Generate SPDX JSON SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.74.0
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          output: sbom.spdx.json
+          exit-code: "0"
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: Attest SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          sbom-path: sbom.spdx.json
+          push-to-registry: true
+      - name: Verify attestations and pull exact digest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh attestation verify "oci://${REGISTRY}/${IMAGE_NAME}@${IMAGE_DIGEST}" \
+            --repo "$GITHUB_REPOSITORY"
+          docker pull "${REGISTRY}/${IMAGE_NAME}@${IMAGE_DIGEST}"
+      - name: Smoke exact published digest
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name responsible-banking-release-smoke \
+            --read-only --tmpfs /tmp --tmpfs /app/.local:uid=10001,gid=10001,mode=0700 \
+            -p 18000:8000 \
+            -e APP_ENV=test -e IDENTITY_PROVIDER=simulated -e REASONING_PROVIDER=stub \
+            -e DATABASE_URL=postgresql://unused -e POLICY_BUNDLE_PATH=policies \
+            -e SESSION_COOKIE_SECURE=false \
+            "${REGISTRY}/${IMAGE_NAME}@${IMAGE_DIGEST}" /bin/sh -c \
+            'banking-agent-identities && exec uvicorn responsible_banking_agent.app:create_app --factory --host 0.0.0.0 --port 8000'
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:18000/healthz; then exit 0; fi
+            echo "Waiting for published image health (${attempt}/30)"
+            sleep 1
+          done
+          docker logs responsible-banking-release-smoke
+          exit 1
+      - name: Remove release smoke container
+        if: always()
+        run: docker rm -f responsible-banking-release-smoke || true
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Create GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf "Private image: \`%s@%s\`\n" "${REGISTRY}/${IMAGE_NAME}" "$IMAGE_DIGEST" > release-notes.md
+          printf '\nSynthetic reference candidate only; not production approved.\n' >> release-notes.md
+          gh release create "$GITHUB_REF_NAME" sbom.spdx.json \
+            --verify-tag --prerelease --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md

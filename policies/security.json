@@ -1,0 +1,18 @@
+{
+  "policy_id": "POL-SECURITY-001",
+  "version": "1.0.0",
+  "sections": [
+    {
+      "section_id": "credential-safety",
+      "title": "Credential safety",
+      "text": "Do not share passwords, PINs, security codes, authentication tokens, or full card details with an assistant.",
+      "keywords": ["password", "pin", "security code", "card", "token"]
+    },
+    {
+      "section_id": "identity-check",
+      "title": "Identity verification",
+      "text": "Account information is available only after the approved identity and authorisation checks succeed.",
+      "keywords": ["identity", "verify", "account access"]
+    }
+  ]
+}

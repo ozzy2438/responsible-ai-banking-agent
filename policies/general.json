@@ -1,0 +1,18 @@
+{
+  "policy_id": "POL-GENERAL-001",
+  "version": "1.0.0",
+  "sections": [
+    {
+      "section_id": "service-hours",
+      "title": "Synthetic service availability",
+      "text": "Service hours vary by channel. Use the verified contact channel shown by your bank.",
+      "keywords": ["branch", "opening hours", "contact", "service"]
+    },
+    {
+      "section_id": "transfer-process",
+      "title": "Transfer process explanation",
+      "text": "A real transfer requires authenticated instructions, confirmation, and the bank's approved payment controls.",
+      "keywords": ["how do", "transfer", "process"]
+    }
+  ]
+}

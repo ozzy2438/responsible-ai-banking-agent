@@ -86,7 +86,9 @@ See [the system card](docs/system-card.md),
 [architecture](docs/architecture.md), and
 [threat model](docs/threat-model.md) for the controlled scope. See
 [delivery controls](docs/delivery.md) for CI jobs, RC publication, SBOM, and
-attestation verification.
+attestation verification. See the
+[production readiness roadmap](docs/production-readiness-roadmap.md) for what
+remains between this reference candidate and any real deployment.
 
 ## Evidence language
 

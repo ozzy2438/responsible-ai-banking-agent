@@ -13,6 +13,7 @@ jobs:
     name: Re-run blocking gates
     permissions:
       contents: read
+      pull-requests: read
     uses: ./.github/workflows/ci.yml
 
   publish:

@@ -3,7 +3,7 @@ name: Release candidate
 on:
   push:
     tags:
-      - v0.1.0-rc.1
+      - v0.1.0-rc.2
 
 permissions:
   contents: read
@@ -13,10 +13,11 @@ jobs:
     name: Re-run blocking gates
     permissions:
       contents: read
+      pull-requests: read
     uses: ./.github/workflows/ci.yml
 
   publish:
-    name: Publish private GHCR candidate
+    name: Publish public GHCR candidate
     needs: gates
     runs-on: ubuntu-latest
     permissions:
@@ -33,7 +34,7 @@ jobs:
           persist-credentials: false
       - name: Enforce the authorised release candidate tag
         shell: bash
-        run: test "$GITHUB_REF_NAME" = "v0.1.0-rc.1"
+        run: test "$GITHUB_REF_NAME" = "v0.1.0-rc.2"
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -48,7 +49,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: latest=false
           tags: |
-            type=raw,value=0.1.0-rc.1
+            type=raw,value=0.1.0-rc.2
             type=raw,value=sha-${{ github.sha }}
       - name: Build and push candidate
         id: push
@@ -127,8 +128,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf "Private image: \`%s@%s\`\n" "${REGISTRY}/${IMAGE_NAME}" "$IMAGE_DIGEST" > release-notes.md
-          printf '\nSynthetic reference candidate only; not production approved.\n' >> release-notes.md
+          printf "Public image: \`%s@%s\`\n" "${REGISTRY}/${IMAGE_NAME}" "$IMAGE_DIGEST" > release-notes.md
+          printf '\nSynthetic public reference candidate only; not production approved.\n' >> release-notes.md
           gh release create "$GITHUB_REF_NAME" sbom.spdx.json \
             --verify-tag --prerelease --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md

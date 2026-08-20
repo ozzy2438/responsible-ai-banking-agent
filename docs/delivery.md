@@ -23,11 +23,11 @@ smoked with a read-only root filesystem.
 
 ## Release candidate
 
-Only the exact `v0.1.0-rc.1` tag activates the release workflow. It first calls
-the full CI workflow again. After all gates pass, it publishes the private GHCR
+Only the exact `v0.1.0-rc.2` tag activates the release workflow. It first calls
+the full CI workflow again. After all gates pass, it publishes the public GHCR
 image with only these tags:
 
-- `0.1.0-rc.1`
+- `0.1.0-rc.2`
 - `sha-<full release commit>`
 
 It deliberately does not publish `latest`. The workflow generates an SPDX JSON
@@ -44,6 +44,7 @@ gh attestation verify \
   --repo ozzy2438/responsible-ai-banking-agent
 ```
 
-The private package must remain linked to and inherit access from the private
-repository. A green workflow is evidence about the tested commit; it is not a
-production deployment, stable release, legal approval, or compliance finding.
+The public package contains only synthetic application code and must never be
+treated as a private customer artifact. A green workflow is evidence about the
+tested commit; it is not a production deployment, stable release, legal
+approval, or compliance finding.

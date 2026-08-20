@@ -41,7 +41,8 @@ but it cannot lower risk, widen access, choose tools, or change disposition.
 - PostgreSQL 16 with separate migration and restricted application roles
 - synthetic fixtures and versioned policy documents
 - Docker and GitHub Actions
-- private GHCR pre-release images with provenance and SBOM attestations
+- public GHCR release-candidate images with provenance and SBOM attestations;
+  no production image or `latest` tag
 
 ## Run locally
 

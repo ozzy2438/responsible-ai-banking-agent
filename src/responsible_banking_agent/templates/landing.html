@@ -6,10 +6,11 @@
     This reference implementation answers verified banking questions from
     synthetic data, then deterministically routes anything regulated,
     high-impact, uncertain, or unsupported to a human reviewer &mdash; every
-    time, by design, not by prompting. Pick a synthetic persona below to try
-    it.
+    time, by design, not by prompting.{% if demo_enabled %} Pick a synthetic
+    persona below to try it.{% endif %}
   </p>
 
+  {% if demo_enabled %}
   <div class="card">
     <h2>Try it as&hellip;</h2>
     <p style="color: var(--muted); font-size: .88rem; margin-top: 0;">
@@ -30,8 +31,18 @@
         Casey Compliance<br><small style="font-weight: 400;">Human-in-the-loop queue</small>
       </button>
     </div>
-    <p id="persona-error" style="color: var(--high); display: none; margin-bottom: 0;"></p>
+    <p id="persona-error" role="alert" aria-live="assertive" style="color: var(--high); display: none; margin-bottom: 0;"></p>
   </div>
+  {% else %}
+  <div class="card">
+    <h2>Local demo disabled</h2>
+    <p style="margin-bottom: 0;">
+      Passwordless synthetic personas are available only in the local/test
+      demo profile. Non-local environments require the configured identity
+      provider and do not expose this sign-in shortcut.
+    </p>
+  </div>
+  {% endif %}
 
   <div class="card">
     <h2>What this demonstrates</h2>
@@ -48,7 +59,7 @@
     <h2>Under the hood</h2>
     <p style="color: var(--muted); font-size: .9rem;">
       Python 3.12 &middot; FastAPI &middot; PostgreSQL 16 &middot; deterministic
-      control flow &middot; 94 automated tests &middot; 11 blocking CI gates
+      control flow &middot; 96 automated tests &middot; 11 blocking CI gates
       (lint, strict typing, unit/integration/policy tests, container smoke,
       dependency/secret/static/image scans) &middot; SBOM and build-provenance
       attestations on every release candidate.
@@ -59,5 +70,7 @@
   </div>
 {% endblock %}
 {% block scripts %}
+  {% if demo_enabled %}
   <script src="/static/landing.js" defer></script>
+  {% endif %}
 {% endblock %}

@@ -27,7 +27,8 @@ function renderList(listEl, blockEl, items, formatter) {
 }
 
 function renderResponse(data) {
-  document.getElementById("response-card").style.display = "block";
+  const responseCard = document.getElementById("response-card");
+  responseCard.style.display = "block";
   const riskBadge = document.getElementById("risk-badge");
   riskBadge.textContent = data.risk_level;
   riskBadge.className = "badge " + badgeClass(data.risk_level);
@@ -70,14 +71,22 @@ function renderResponse(data) {
     data.next_steps,
     (s) => s
   );
-  document.getElementById("response-card").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  responseCard.focus({ preventScroll: true });
+  responseCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function setPending(isPending) {
+  document.getElementById("submit-btn").disabled = isPending;
+  document.querySelectorAll("button.scenario").forEach((button) => {
+    button.disabled = isPending || (button.dataset.requiresAccount === "true" && !accountId);
+  });
+  document.getElementById("assist-form").setAttribute("aria-busy", String(isPending));
 }
 
 async function ask(message, useAccount) {
   const errorEl = document.getElementById("assist-error");
   errorEl.style.display = "none";
-  const submitBtn = document.getElementById("submit-btn");
-  submitBtn.disabled = true;
+  setPending(true);
   try {
     const res = await fetch("/v1/assist", {
       method: "POST",
@@ -99,7 +108,7 @@ async function ask(message, useAccount) {
     errorEl.textContent = err.message;
     errorEl.style.display = "block";
   } finally {
-    submitBtn.disabled = false;
+    setPending(false);
   }
 }
 

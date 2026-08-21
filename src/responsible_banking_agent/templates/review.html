@@ -18,8 +18,11 @@
       <form method="post" action="/review/escalations/{{ item.id }}/actions">
         <input type="hidden" name="csrf" value="{{ csrf }}">
         <label>Action
-          <select name="action">
-            <option value="acknowledge">Acknowledge</option>
+          <select name="action" required>
+            <option value="" selected disabled>Select action</option>
+            {% if item.status == 'open' %}
+              <option value="acknowledge">Acknowledge</option>
+            {% endif %}
             <option value="route">Route</option>
             <option value="close">Close</option>
           </select>

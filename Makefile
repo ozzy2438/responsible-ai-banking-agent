@@ -38,6 +38,7 @@ regenerate-synthetic-seed:
 
 # One-command synthetic demo: builds the app image, starts PostgreSQL,
 # migrates the schema, seeds local demo identities, and serves on :8000.
+# The loopback-only PostgreSQL state is ephemeral and recreated after `down`.
 # Synthetic data only — see README.md#demonstration-scenarios.
 demo:
 	docker compose up --build

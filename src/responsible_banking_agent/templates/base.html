@@ -88,6 +88,10 @@
       button:hover, .button:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
       button.secondary:hover, .button.secondary:hover { background: #eef3fb; }
       button:disabled { opacity: .5; cursor: not-allowed; }
+      :focus-visible {
+        outline: 3px solid #f2a900;
+        outline-offset: 3px;
+      }
       input, select, textarea {
         font: inherit;
         padding: .55rem .6rem;
@@ -111,6 +115,11 @@
       .badge.medium { background: var(--medium-bg); color: var(--medium); }
       .badge.high { background: var(--high-bg); color: var(--high); }
       .badge.neutral { background: #eef1f6; color: var(--muted); }
+      .response-section-title {
+        color: var(--muted);
+        font-size: .82rem;
+        margin: .9rem 0 .3rem;
+      }
       footer.site { text-align: center; color: var(--muted); font-size: .78rem; padding: 2rem 1rem; }
       ul.plain { padding-left: 1.1rem; margin: .4rem 0; }
       ul.plain li { margin: .2rem 0; }

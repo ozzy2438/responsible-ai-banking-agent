@@ -18,7 +18,7 @@
         <span class="badge low">Low</span><br>
         <small style="font-weight: 400;">General FAQ</small>
       </button>
-      <button type="button" class="scenario secondary" data-scenario="medium" {% if not account_id %}disabled{% endif %}>
+      <button type="button" class="scenario secondary" data-scenario="medium" data-requires-account="true" {% if not account_id %}disabled{% endif %}>
         <span class="badge medium">Medium</span><br>
         <small style="font-weight: 400;">
           {% if account_id %}My account balance{% else %}Requires a customer account{% endif %}
@@ -52,28 +52,28 @@
     </form>
   </div>
 
-  <div id="response-card" class="card" style="display: none;">
+  <div id="response-card" class="card" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" style="display: none;">
     <h2>Response <span id="risk-badge"></span> <span id="disposition-badge" class="badge neutral"></span></h2>
     <p id="answer-text"></p>
     <div id="escalation-note" style="display: none; background: var(--high-bg); color: var(--high); border-radius: .4rem; padding: .6rem .8rem; font-size: .88rem; margin: .6rem 0;"></div>
     <div id="facts-block" style="display: none;">
-      <label style="margin-top: .9rem;">Verified facts</label>
+      <h3 class="response-section-title">Verified facts</h3>
       <ul class="plain" id="facts-list"></ul>
     </div>
     <div id="citations-block" style="display: none;">
-      <label>Citations</label>
+      <h3 class="response-section-title">Citations</h3>
       <ul class="plain" id="citations-list"></ul>
     </div>
     <div id="uncertainty-block" style="display: none;">
-      <label>Uncertainty</label>
+      <h3 class="response-section-title">Uncertainty</h3>
       <ul class="plain" id="uncertainty-list"></ul>
     </div>
     <div id="next-steps-block" style="display: none;">
-      <label>Next steps</label>
+      <h3 class="response-section-title">Next steps</h3>
       <ul class="plain" id="next-steps-list"></ul>
     </div>
   </div>
-  <p id="assist-error" style="color: var(--high); display: none;"></p>
+  <p id="assist-error" role="alert" aria-live="assertive" style="color: var(--high); display: none;"></p>
   <div id="demo-config" data-account-id="{{ account_id or '' }}" style="display: none;"></div>
 {% endblock %}
 {% block scripts %}

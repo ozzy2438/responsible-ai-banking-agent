@@ -1,7 +1,7 @@
-"""End-to-end coverage of the one-command demo: startup, the customer
-assistant journey across all four risk tiers, and the reviewer queue
-journey — driven through the real FastAPI app and a real PostgreSQL
-database, the same way `make demo` / `docker compose up` serve it.
+"""HTTP integration coverage for the demo routes and customer/reviewer journeys.
+
+The blocking Container smoke CI job separately exercises the packaged Docker
+Compose startup path against PostgreSQL through its published HTTP port.
 """
 
 import os
@@ -156,7 +156,7 @@ def test_customer_journey_covers_all_four_risk_tiers() -> None:
     assert "system prompt" not in injection["answer"].lower()
 
 
-def test_reviewer_journey_sees_escalation_and_can_acknowledge_it() -> None:
+def test_reviewer_journey_sees_routes_and_closes_an_escalation() -> None:
     client = _client()
     client.post("/dev/login", json={"alias": "alice"})
     escalated = client.post(
@@ -182,13 +182,50 @@ def test_reviewer_journey_sees_escalation_and_can_acknowledge_it() -> None:
     assert api_queue.status_code == 200
     assert any(item["id"] == escalation_id for item in api_queue.json())
 
-    action = client.post(
+    route_action = client.post(
         f"/review/escalations/{escalation_id}/actions",
-        data={"action": "acknowledge", "reason": "Reviewed in the demo journey test", "csrf": csrf},
+        data={
+            "action": "route",
+            "route": "hardship",
+            "reason": "Routed in the demo journey test",
+            "csrf": csrf,
+        },
         follow_redirects=False,
     )
-    assert action.status_code == 303
+    assert route_action.status_code == 303
 
     updated_queue = client.get("/v1/reviewer/escalations").json()
     updated = next(item for item in updated_queue if item["id"] == escalation_id)
-    assert updated["status"] == "acknowledged"
+    assert updated["status"] == "routed"
+    assert updated["route"] == "hardship"
+
+    queue_page = client.get("/review/escalations")
+    close_csrf = client.cookies.get("csrf_token")
+    assert close_csrf
+    stale_acknowledge = client.post(
+        f"/review/escalations/{escalation_id}/actions",
+        data={
+            "action": "acknowledge",
+            "route": "",
+            "reason": "Stale reviewer form must fail closed",
+            "csrf": close_csrf,
+        },
+        follow_redirects=False,
+    )
+    assert stale_acknowledge.status_code == 409
+    close_action = client.post(
+        f"/review/escalations/{escalation_id}/actions",
+        data={
+            "action": "close",
+            "route": "",
+            "reason": "Closed in the demo journey test",
+            "csrf": close_csrf,
+        },
+        follow_redirects=False,
+    )
+    assert close_action.status_code == 303
+    closed_page = client.get("/review/escalations")
+    assert escalation_id not in closed_page.text
+    assert all(
+        item["id"] != escalation_id for item in client.get("/v1/reviewer/escalations").json()
+    )

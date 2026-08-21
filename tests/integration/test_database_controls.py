@@ -156,3 +156,33 @@ def test_review_actions_are_controlled_and_immutable() -> None:
             "UPDATE review_actions SET reason = 'tampered' WHERE escalation_id = %s",
             (stored.escalation_id,),
         )
+
+
+def test_rate_limit_state_is_function_only_and_concurrency_safe() -> None:
+    settings = _settings()
+    migrate(settings)
+    subject_hash = "a" * 64
+    route_group = f"test-{uuid4()}"
+
+    def consume(_: int) -> bool:
+        with psycopg.connect(settings.database_url) as connection:
+            row = connection.execute(
+                "SELECT consume_rate_limit(%s, %s, %s, %s)",
+                (subject_hash, route_group, 4, 60),
+            ).fetchone()
+        assert row is not None
+        return bool(row[0])
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        decisions = list(pool.map(consume, range(8)))
+    assert sum(decisions) == 4
+
+    with psycopg.connect(settings.database_url) as connection:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            connection.execute("SELECT * FROM rate_limit_buckets").fetchall()
+        connection.rollback()
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            connection.execute(
+                "INSERT INTO rate_limit_buckets VALUES (%s, %s, now(), 1)",
+                ("b" * 64, route_group),
+            )

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from responsible_banking_agent.bank_data import BankDataUnavailable
 from responsible_banking_agent.models import (
     Actor,
     AssistRequest,
@@ -124,3 +125,35 @@ def test_provider_failure_uses_safe_deterministic_fallback() -> None:
     )
     assert response.disposition.value == "answered"
     assert response.citations
+
+
+class UnavailableBankData:
+    def get_authorized_account(self, actor_id: UUID, account_id: UUID) -> AccountRecord | None:
+        del actor_id, account_id
+        raise BankDataUnavailable("upstream detail")
+
+    def get_authorized_transactions(
+        self, actor_id: UUID, account_id: UUID, limit: int = 5
+    ) -> list[TransactionRecord]:
+        del actor_id, account_id, limit
+        raise BankDataUnavailable("upstream detail")
+
+
+def test_bank_evidence_failure_escalates_without_facts_or_upstream_details() -> None:
+    service = BankingService(
+        MemoryRepository(),
+        PolicyStore(Path("policies")),
+        DeterministicStub(),
+        UnavailableBankData(),
+    )
+    response = service.assist(
+        _actor(),
+        AssistRequest(
+            message="What is my account balance?",
+            account_id=UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+        ),
+        str(uuid4()),
+    )
+    assert response.disposition.value == "escalated"
+    assert response.verified_facts == []
+    assert "upstream" not in response.model_dump_json()

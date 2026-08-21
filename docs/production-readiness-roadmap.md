@@ -21,11 +21,11 @@ production deployment, legal approval, or compliance finding — see
 | # | Stage | Type | Status |
 |---|---|---|---|
 | 1 | Reconcile RC2 release fixes onto the trunk branch | Engineering | Done — see below |
-| 2 | Real identity provider and strong customer authentication | Engineering + external | Not started |
-| 3 | Approved real bank system and data integrations | Engineering + external | Not started |
+| 2 | Real identity provider and strong customer authentication | Engineering + external | Generic adapter complete; bank selection/review pending |
+| 3 | Approved real bank system and data integrations | Engineering + external | Generic adapter complete; real contract/access pending |
 | 4 | Bank legal, risk, privacy, and compliance approval | Organizational | Not started |
-| 5 | Production infrastructure: secrets, monitoring, DR, incident response | Engineering + organizational | Not started |
-| 6 | Independent security testing, UAT, model-risk validation, controlled pilot | External + organizational | Not started |
+| 5 | Production infrastructure: secrets, monitoring, DR, incident response | Engineering + organizational | Security foundations complete; platform/HA/DR/SIEM pending |
+| 6 | Independent security testing, UAT, model-risk validation, controlled pilot | External + organizational | Scope/checklists ready; external execution pending |
 
 "Engineering" items can be advanced by writing code and docs in this
 repository. "External" and "organizational" items require people, contracts,
@@ -41,10 +41,9 @@ three release-workflow fixes that actually shipped as `v0.1.0-rc.2`
 through review. `main` and the published RC2 image therefore diverged: the
 tag was correct, the trunk branch was stale.
 
-This branch merges those three commits so its `.github/workflows/release.yml`,
-`README.md`, and `docs/delivery.md` are now byte-identical to the
-`v0.1.0-rc.2` tag. Once this lands on `main` through normal review, the drift
-is closed.
+PR #10 merged those three commits through normal review. Its
+`.github/workflows/release.yml`, `README.md`, and `docs/delivery.md` reconciled
+the published `v0.1.0-rc.2` state onto `main`; the drift is closed.
 
 **Prevention:** treat a pushed release tag as a signal to check that the tag
 commit is reachable from `main`, not just that the tag exists. A branch
@@ -54,24 +53,16 @@ automatically.
 
 ## 2. Real identity provider and strong customer authentication
 
-Today, identity is a local-only secure cookie or a bearer token minted by
-`POST /dev/login`, which the app refuses to expose outside `local`/`test`
-environments (see [`docs/architecture.md`](architecture.md) and the README's
-run instructions). That boundary is correct for a reference app and wrong for
-production.
+Local/test identity remains a secure cookie or bearer token minted by
+`POST /dev/login`. Production-like startup now rejects that path and requires
+the vendor-neutral OIDC adapter described in
+[`production-configuration.md`](production-configuration.md).
 
-**Engineering work this repo can do:**
-- Introduce a pluggable authentication-provider interface, mirroring the
-  optional-provider pattern already used for reasoning
-  ([ADR 0002](decisions/0002-optional-openai-provider.md)): a
-  production build selects an OIDC/OAuth2 adapter; `local`/`test` keep the
-  simulated identity path, unreachable by construction outside those
-  environments.
-- JWKS-based token validation, session binding to `request_id`, and
-  step-up/MFA hooks that the risk layer can require before high-risk actions.
-- Fail closed (escalate, do not authenticate) if the real IdP is unreachable
-  or returns an ambiguous result, consistent with the existing
-  fail-closed posture in [`docs/architecture.md`](architecture.md#failure-behaviour).
+**Engineering foundation implemented:** pluggable identity selection;
+issuer/audience/JWKS validation; asymmetric algorithm allow-list; controlled
+actor/role claims; role-specific OAuth scopes; reviewer/compliance ACR step-up;
+and generic authentication failure without token or provider detail leakage.
+There is no fallback to simulated identity outside local/test.
 
 **Not closable by engineering alone:** which IdP/SCA method the bank actually
 runs, the customer consent and re-authentication policy, and acceptance of
@@ -82,24 +73,22 @@ production build; an independent auth review has signed off the adapter.
 
 ## 3. Approved real bank system and data integrations
 
-All account, transaction, and policy data today are synthetic fixtures with a
+All configured account, transaction, and policy data today are synthetic fixtures with a
 committed manifest hash ([`docs/policy-source-register.md`](policy-source-register.md)).
 A larger, deterministic synthetic dataset now exists
 ([`docs/synthetic-data.md`](synthetic-data.md)) for engineering confidence and
 demos at scale — it strengthens this stage's testing but does not close it: a
 bigger synthetic dataset is still synthetic, not an approved real data source.
 
-**Engineering work this repo can do:**
-- Keep the same evidence-retrieval contract (deterministic selection,
-  citation validation, read-only authority per
-  [ADR 0001](decisions/0001-read-only-authority.md)) but point it at a real
-  core-banking read API instead of PostgreSQL fixtures.
-- Contract tests against the bank's sandbox/staging API so the deterministic
-  control layer is verified against real response shapes before any
-  production credential exists.
-- Replace synthetic policy fixtures with the bank's actual, versioned policy
-  content, keeping the same provenance/citation requirement so an answer
-  without a traceable source still fails closed.
+**Engineering foundation implemented:** a separate read-only HTTPS+mTLS bank
+adapter with bounded timeouts, no redirects, strict response schemas,
+customer/account equality checks, source-system/version citations, and safe
+escalation for unavailable or conflicting evidence. Mock contract tests exist;
+no real bank endpoint or credential is configured.
+
+**Engineering still requiring an external sandbox:** run the same contract
+suite against the selected bank staging API and replace synthetic policy
+fixtures with approved, versioned bank policy content.
 
 **Not closable by engineering alone:** approved API access to core banking
 systems, a data-sharing agreement, and a data-classification sign-off on
@@ -135,30 +124,29 @@ documents above — no repository change substitutes for that decision.
 
 ## 5. Production infrastructure: secrets, monitoring, DR, incident response
 
-The [system card](system-card.md#known-limitations) already states this
-plainly: no production rate limiting, high availability, disaster recovery,
-or SIEM today; [the incident runbook](runbooks/incident-response.md) is
-explicitly "not an APRA, OAIC, AUSTRAC, ASIC, or bank incident procedure."
+The [system card](system-card.md#known-limitations) states the remaining gap:
+the generic controls are not connected to an approved ingress, secrets
+platform, HA database, disaster-recovery process, SIEM, SOC, or on-call team.
+The [incident runbook](runbooks/incident-response.md) is explicitly not an
+APRA, OAIC, AUSTRAC, ASIC, or bank incident procedure.
 
-**Engineering work this repo can do:**
-- Replace `.env`-based local secrets with a secrets-manager-backed config
-  loader (Vault/KMS-class), so no credential is ever committed or shipped in
-  an image layer.
-- Rate limiting and structured, redaction-first observability
-  (building on the redaction rules already enforced in
-  [`docs/privacy-data-lifecycle.md`](privacy-data-lifecycle.md)) with export
-  to the bank's SIEM.
-- An HA topology for PostgreSQL and a DR runbook that extends
-  [`docs/runbooks/incident-response.md`](runbooks/incident-response.md)
-  with real recovery-time/point objectives, once a hosting decision exists.
+**Engineering foundation implemented:** fixed mounted-secret loading for
+production-like environments; explicit hosts and request-body bounds;
+HMAC-pseudonymised IP/actor rate limits through a function-only PostgreSQL
+store; request IDs; security headers; and allow-listed JSON request logs.
+
+**Engineering still requiring platform decisions:** export logs to the bank's
+SIEM and implement an HA topology for PostgreSQL and a DR runbook that extends
+[`docs/runbooks/incident-response.md`](runbooks/incident-response.md) with real
+recovery-time/point objectives, once a hosting decision exists.
 
 **Not closable by engineering alone:** the bank's actual hosting/cloud
 decision, its secrets platform, SOC/SIEM ownership, on-call rotation, and a
 signed business-continuity plan.
 
-**Exit criteria:** the "known limitations" bullet on rate limiting, HA, DR,
-and SIEM in [`docs/system-card.md`](system-card.md#known-limitations) is
-retired, with evidence linked from this roadmap.
+**Exit criteria:** selected-platform load/failover evidence, secrets rotation,
+SIEM alert validation, tested restore/failover with approved RTO/RPO, and named
+operational owners are linked from this roadmap.
 
 ## 6. Independent security testing, UAT, model-risk validation, controlled pilot
 
@@ -168,11 +156,14 @@ The current evaluation gate is a fixed, deterministic, repo-internal corpus:
 committed code meets its own declared gates — it is not independent
 verification.
 
-**Engineering work this repo can do:** grow the adversarial corpus with
-findings from UAT and pentest, publish a scoped test-environment/rules doc
-for an external penetration test, and instrument model-risk metrics
-(escalation precision/recall, refusal rate, drift against the golden corpus)
-so an MRM committee has real evidence to review.
+**Engineering preparation implemented:** the extended synthetic corpus,
+[`security-test-scope.md`](security-test-scope.md),
+[`model-risk-monitoring.md`](model-risk-monitoring.md),
+[`pilot-readiness-checklist.md`](pilot-readiness-checklist.md), and
+[`assurance-handoff.md`](assurance-handoff.md) define scope, stop conditions,
+baseline blocking metrics, required evidence, owners, and pilot gates. Findings
+from real UAT/pentest must later become regression cases without weakening the
+fixed golden corpus.
 
 **Not closable by engineering alone:** a third-party independent penetration
 test, UAT with actual bank staff, model-risk-management committee sign-off,
@@ -182,9 +173,9 @@ a coding session.
 
 ## What this document is not
 
-It is not a project plan with dates, not a compliance certification, and not
-an implementation of stages 2–6 — those stages are mostly gated on decisions
-and approvals that belong to the bank, not to this repository. It exists so
-that the engineering-closable portion of each stage is tracked in the same
-place as the controls it depends on, and so the organizational-only items are
-never mistaken for something a future commit could resolve.
+It is not a project plan with dates or a compliance certification. Generic
+engineering foundations for stages 2, 3, and 5 do not complete those stages;
+they remain gated on decisions and approvals that belong to the bank. It
+exists so that the engineering-closable portion of each stage is tracked in
+the same place as the controls it depends on, and so the organizational-only
+items are never mistaken for something a future commit could resolve.

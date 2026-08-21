@@ -1,18 +1,31 @@
 import secrets
+import time
 from pathlib import Path
 from typing import Annotated, Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import Cookie, Depends, FastAPI, Form, Header, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from .bank_data import build_bank_data_provider
 from .config import Settings
-from .identity import AuthenticationError, IdentityStore
+from .identity import AuthenticationError, IdentityProvider, IdentityStore, build_identity_provider
+from .middleware import BodyLimitMiddleware
 from .models import Actor, AssistRequest, AssistResponse, EscalationRoute, Role
+from .observability import configure_http_logger, route_group
 from .policies import PolicyStore
+from .rate_limit import (
+    RateLimiter,
+    RateLimitUnavailable,
+    build_rate_limiter,
+    hash_rate_limit_subject,
+)
 from .reasoning.openai_adapter import OpenAIResponsesAdapter
 from .reasoning.stub import DeterministicStub
 from .repository import BankingRepository, Repository
@@ -35,35 +48,105 @@ def create_app(
     settings: Settings | None = None,
     repository: BankingRepository | None = None,
     identities: IdentityStore | None = None,
+    rate_limiter: RateLimiter | None = None,
 ) -> FastAPI:
     settings = settings or Settings.from_env()
     repository = repository or Repository(settings.database_url)
-    identities = identities or IdentityStore.from_file(settings.identities_file)
+    identity_provider: IdentityProvider = build_identity_provider(settings, identities)
     policies = PolicyStore(settings.policy_bundle_path)
     provider = (
         OpenAIResponsesAdapter(settings.openai_model or "")
         if settings.reasoning_provider == "openai"
         else DeterministicStub()
     )
-    service = BankingService(repository, policies, provider)
+    data_provider = build_bank_data_provider(settings=settings, synthetic_provider=repository)
+    rate_limiter = rate_limiter or build_rate_limiter(settings)
+    rate_limit_key = settings.rate_limit_hmac_key or "local-only-rate-limit-key-not-for-production"
+    http_logger = configure_http_logger(settings.log_format)
+    service = BankingService(repository, policies, provider, data_provider)
     templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-    app = FastAPI(title="Responsible AI Banking Agent", version="0.1.0-rc.1")
+    app = FastAPI(title="Responsible AI Banking Agent", version="0.2.0-dev")
     app.state.settings = settings
     app.state.repository = repository
-    app.state.identities = identities
+    app.state.identity_provider = identity_provider
+    app.state.rate_limiter = rate_limiter
     app.state.service = service
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=list(settings.allowed_hosts),
+        www_redirect=False,
+    )
+    app.add_middleware(BodyLimitMiddleware, max_bytes=settings.max_request_body_bytes)
 
-    @app.middleware("http")
-    async def security_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
-        response = await call_next(request)
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
+        del request, exc
+        return JSONResponse(
+            {"detail": "Request validation failed"},
+            status_code=422,
+        )
+
+    def add_security_headers(response: Response, request_id: str) -> Response:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; style-src 'self' 'unsafe-inline'"
         )
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
         response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Request-ID"] = request_id
+        if settings.is_production_like:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
+
+    @app.middleware("http")
+    async def security_headers(request: Request, call_next: RequestResponseEndpoint) -> Response:
+        try:
+            request_id = str(UUID(request.headers.get("X-Request-ID", "")))
+        except ValueError:
+            request_id = str(uuid4())
+        request.state.request_id = request_id
+        group = route_group(request.url.path)
+        started = time.perf_counter()
+
+        if group not in {"/healthz", "/readyz"}:
+            client_host = request.client.host if request.client else "unknown"
+            subject_hash = hash_rate_limit_subject(rate_limit_key, f"ip:{client_host}")
+            try:
+                allowed = await run_in_threadpool(rate_limiter.allow, subject_hash, f"ip:{group}")
+            except RateLimitUnavailable:
+                response: Response = JSONResponse(
+                    {"detail": "Request control unavailable"}, status_code=503
+                )
+            else:
+                response = (
+                    await call_next(request)
+                    if allowed
+                    else JSONResponse(
+                        {"detail": "Too many requests"},
+                        status_code=429,
+                        headers={"Retry-After": str(settings.rate_limit_window_seconds)},
+                    )
+                )
+        else:
+            response = await call_next(request)
+
+        duration_ms = round((time.perf_counter() - started) * 1000, 2)
+        http_logger.info(
+            "http_request",
+            extra={
+                "request_id": request_id,
+                "method": request.method,
+                "route_group": group,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+        return add_security_headers(response, request_id)
 
     def current_actor(
         authorization: Annotated[str | None, Header()] = None,
@@ -75,7 +158,7 @@ def create_app(
         if not token:
             raise HTTPException(status_code=401, detail="Authentication required")
         try:
-            return identities.authenticate(token)
+            return identity_provider.authenticate(token)
         except AuthenticationError as exc:
             raise HTTPException(status_code=401, detail="Authentication failed") from exc
 
@@ -102,6 +185,17 @@ def create_app(
             str, Header(alias="Idempotency-Key", min_length=8, max_length=100)
         ],
     ) -> AssistResponse:
+        subject_hash = hash_rate_limit_subject(rate_limit_key, f"actor:{actor.actor_id}")
+        try:
+            allowed = rate_limiter.allow(subject_hash, "actor:/v1/assist")
+        except RateLimitUnavailable as exc:
+            raise HTTPException(status_code=503, detail="Request control unavailable") from exc
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests",
+                headers={"Retry-After": str(settings.rate_limit_window_seconds)},
+            )
         return service.assist(actor, body, idempotency_key)
 
     @app.get("/v1/requests/{request_id}", response_model=AssistResponse)
@@ -140,12 +234,14 @@ def create_app(
 
     @app.post("/dev/login", status_code=204)
     def dev_login(body: DevLogin, response: Response) -> Response:
-        if settings.app_env not in {"local", "test"}:
+        if settings.app_env not in {"local", "test"} or not isinstance(
+            identity_provider, IdentityStore
+        ):
             raise HTTPException(status_code=404)
         response.status_code = 204
         response.set_cookie(
             "session_token",
-            identities.token_for_alias(body.alias),
+            identity_provider.token_for_alias(body.alias),
             httponly=True,
             secure=settings.session_cookie_secure,
             samesite="strict",

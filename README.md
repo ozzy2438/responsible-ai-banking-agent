@@ -5,7 +5,7 @@ application** for testing safe banking-assistant controls. It answers verified
 general questions and authorised read-only account questions, then routes
 regulated, high-impact, uncertain, or unsupported requests to a human workflow.
 
-> Status: initial reference implementation candidate. This repository is not a
+> Status: post-RC2 production-foundation development. This repository is not a
 > bank system, legal opinion, compliance certification, production deployment,
 > or evidence that an AI system is safe for real customers.
 
@@ -43,6 +43,9 @@ but it cannot lower risk, widen access, choose tools, or change disposition.
 - Docker and GitHub Actions
 - public GHCR release-candidate images with provenance and SBOM attestations;
   no production image or `latest` tag
+- vendor-neutral OIDC, read-only bank API, mounted-secret, shared rate-limit,
+  and structured-log foundations that remain disabled until approved external
+  systems and credentials are supplied
 
 ## Run locally
 
@@ -68,6 +71,14 @@ Copy `.env.example` values into your shell, then run:
 environments. Bearer tokens generated in `.local/identities.json` are for local
 testing and are ignored by Git. Non-local startup rejects simulated identity.
 
+Production-like startup is deliberately fail-closed: it requires an HTTPS OIDC
+issuer/JWKS/audience, role-appropriate OAuth scopes, step-up assurance for
+reviewers, mounted secret files, an HTTPS+mTLS read-only bank API, PostgreSQL
+rate limiting, explicit hosts, secure cookies, and JSON logs. See
+[production configuration](docs/production-configuration.md). These controls
+are adapters and validation boundaries, not evidence that a bank has approved
+or connected any external system.
+
 The optional OpenAI adapter is disabled by default. Enabling it requires
 `REASONING_PROVIDER=openai`, an explicit `OPENAI_MODEL`, and
 `OPENAI_API_KEY`. It receives only redacted, authorised facts, requests strict
@@ -91,6 +102,8 @@ attestation verification. See the
 remains between this reference candidate and any real deployment, and
 [synthetic data](docs/synthetic-data.md) for the bulk seed dataset used for
 local development, demos, and stress testing.
+The [assurance handoff](docs/assurance-handoff.md) lists the remaining named
+bank/external owners and evidence that cannot be produced by this repository.
 
 ## Evidence language
 

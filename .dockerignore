@@ -13,4 +13,9 @@ __pycache__
 *.log
 artifacts
 sbom*.json
+*.pem
+*.key
+*.p12
+*.pfx
+secrets
 tests

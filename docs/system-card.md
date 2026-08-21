@@ -31,7 +31,10 @@ No live model call occurs in CI or the acceptance suite.
 
 ## Known limitations
 
-- No real identity provider, consent system, core banking API, or records schedule.
-- No production rate limiting, high availability, disaster recovery, or SIEM.
+- OIDC and read-only bank API adapters exist, but no real provider, consent
+  policy, core-banking endpoint, credential, or records schedule is approved.
+- Shared rate limiting, mounted-secret loading, and structured JSON logs exist,
+  but no production ingress, high availability, disaster recovery, SIEM, SOC,
+  or on-call ownership is configured or tested.
 - Golden cases prove expected behaviour only for the committed corpus.
 - Passing gates is not evidence of legal compliance or production fitness.

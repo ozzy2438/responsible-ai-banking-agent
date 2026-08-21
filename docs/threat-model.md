@@ -20,10 +20,20 @@
 | Replay or duplicate request | Required idempotency key and database uniqueness | Concurrent integration test |
 | Audit alteration | Privileges plus database trigger | Direct-role update/delete probes |
 | Supply-chain compromise | Pinned actions, audits, SBOM, provenance attestation | CI and attestation verification |
+| Forged or confused-deputy identity | OIDC issuer/audience/JWKS/asymmetric algorithm validation plus UUID role claims | OIDC unit tests |
+| Authenticated but unauthorised role use | Role-appropriate OAuth scopes and reviewer ACR step-up | Identity contract tests |
+| Compromised/misdirected bank response | HTTPS+mTLS, strict schemas, no redirects, identity/account equality checks | Adapter contract tests |
+| Request flooding | HMAC-pseudonymised IP and actor limits; shared function-only PostgreSQL buckets | API and database tests |
+| Log leakage | Normalised route groups and allow-listed structured metadata only | Formatter and API tests |
+| Oversized request | ASGI body limit before model parsing | API boundary tests |
+| Host-header abuse | Explicit trusted-host allow-list | API boundary tests |
 
 ## Explicit residual risk
 
 Keyword and pattern classification is not a production-grade intent classifier.
-Synthetic identities are not production authentication. Local cookies and the
-review UI are for demonstration only. Regulatory mappings require independent
-legal, compliance, privacy, security, accessibility, and operational review.
+The OIDC and bank adapters have no approved bank configuration or external
+contract test environment. Local cookies and the review UI are for demonstration
+only. The fixed-window limiter still depends on correct ingress client-address
+handling and the selected PostgreSQL topology. Regulatory mappings require
+independent legal, compliance, privacy, security, accessibility, and operational
+review.

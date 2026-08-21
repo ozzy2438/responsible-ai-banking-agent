@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: setup identities db-up migrate serve lint typecheck test db-down regenerate-synthetic-seed
+.PHONY: setup identities db-up migrate serve lint typecheck test verify db-down regenerate-synthetic-seed
 
 setup:
 	python3.12 -m venv .venv
@@ -27,6 +27,8 @@ typecheck:
 
 test:
 	$(PYTHON) -m pytest
+
+verify: lint typecheck test
 
 db-down:
 	docker compose down

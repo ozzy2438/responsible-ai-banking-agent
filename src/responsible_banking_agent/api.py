@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from fastapi import Cookie, Depends, FastAPI, Form, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
@@ -44,6 +45,16 @@ class ReviewAction(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
 
 
+# Presentation-only lookup for the demo UI: which synthetic fixture account a
+# demo customer persona owns, so the "attach my account" scenario button can
+# pass a real, authorised account_id. Every service-layer authorization check
+# in service.py re-verifies ownership regardless of what this map contains.
+_DEMO_CUSTOMER_ACCOUNTS = {
+    UUID("11111111-1111-4111-8111-111111111111"): UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+    UUID("22222222-2222-4222-8222-222222222222"): UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+}
+
+
 def create_app(
     settings: Settings | None = None,
     repository: BankingRepository | None = None,
@@ -66,6 +77,11 @@ def create_app(
     service = BankingService(repository, policies, provider, data_provider)
     templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
     app = FastAPI(title="Responsible AI Banking Agent", version="0.2.0-dev")
+    app.mount(
+        "/static",
+        StaticFiles(directory=Path(__file__).parent / "static"),
+        name="static",
+    )
     app.state.settings = settings
     app.state.repository = repository
     app.state.identity_provider = identity_provider
@@ -167,6 +183,28 @@ def create_app(
             raise HTTPException(status_code=403, detail="Reviewer role required")
         return actor
 
+    def optional_actor(
+        authorization: Annotated[str | None, Header()] = None,
+        session_token: Annotated[str | None, Cookie()] = None,
+    ) -> Actor | None:
+        token = session_token
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization[7:]
+        if not token:
+            return None
+        try:
+            return identity_provider.authenticate(token)
+        except AuthenticationError:
+            return None
+
+    @app.get("/", response_class=HTMLResponse)
+    def landing(
+        request: Request, actor: Annotated[Actor | None, Depends(optional_actor)]
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name="landing.html", context={"actor": actor}
+        )
+
     @app.get("/healthz")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -248,6 +286,19 @@ def create_app(
             max_age=3600,
         )
         return response
+
+    @app.get("/demo", response_class=HTMLResponse, response_model=None)
+    def demo(
+        request: Request, actor: Annotated[Actor | None, Depends(optional_actor)]
+    ) -> HTMLResponse | RedirectResponse:
+        if actor is None:
+            return RedirectResponse("/", status_code=303)
+        account_id = _DEMO_CUSTOMER_ACCOUNTS.get(actor.actor_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="demo.html",
+            context={"actor": actor, "account_id": account_id},
+        )
 
     @app.get("/review/escalations", response_class=HTMLResponse)
     def review_page(request: Request, actor: Annotated[Actor, Depends(reviewer)]) -> HTMLResponse:

@@ -59,6 +59,7 @@ class FakeRepository:
                 "status": "open",
                 "summary": "Synthetic review case",
                 "redacted_message": "Help with my account",
+                "risk_level": "HIGH",
             }
         ]
 
@@ -276,3 +277,35 @@ def test_request_boundary_enforces_ids_hosts_body_limits_and_rate_limits() -> No
 
     invalid_host = oversized_client.get("/healthz", headers={"Host": "evil.example"})
     assert invalid_host.status_code == 400
+
+
+def test_landing_and_static_assets_are_public() -> None:
+    client, _ = _client()
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert "Alice Example" in landing.text
+    assert landing.headers["content-security-policy"] == (
+        "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    )
+
+    script = client.get("/static/landing.js")
+    assert script.status_code == 200
+    assert "/dev/login" in script.text
+
+
+def test_demo_page_requires_sign_in_and_reflects_known_account() -> None:
+    client, _ = _client()
+    signed_out = client.get("/demo", follow_redirects=False)
+    assert signed_out.status_code == 303
+    assert signed_out.headers["location"] == "/"
+
+    client.post("/dev/login", json={"alias": "alice"})
+    alice_demo = client.get("/demo")
+    assert alice_demo.status_code == 200
+    assert str(ACCOUNT_ID) in alice_demo.text
+
+    client.cookies.clear()
+    client.post("/dev/login", json={"alias": "reviewer"})
+    reviewer_demo = client.get("/demo")
+    assert reviewer_demo.status_code == 200
+    assert str(ACCOUNT_ID) not in reviewer_demo.text

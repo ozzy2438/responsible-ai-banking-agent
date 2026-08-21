@@ -1,9 +1,9 @@
-name: Release candidate
+name: Stable release
 
 on:
   push:
     tags:
-      - v0.1.0-rc.2
+      - v1.0.0
 
 permissions:
   contents: read
@@ -17,7 +17,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
 
   publish:
-    name: Publish public GHCR candidate
+    name: Publish public GHCR release
     needs: gates
     runs-on: ubuntu-latest
     permissions:
@@ -32,9 +32,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Enforce the authorised release candidate tag
+      - name: Enforce tag, protected-main ancestry, package and API version
+        env:
+          EXPECTED_VERSION: "1.0.0"
         shell: bash
-        run: test "$GITHUB_REF_NAME" = "v0.1.0-rc.2"
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "v${EXPECTED_VERSION}"
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          package_version="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          test "$package_version" = "$EXPECTED_VERSION"
+          python -m pip install --upgrade pip==26.2
+          python -m pip install .
+          api_version="$(python -c 'from responsible_banking_agent.version import __version__; print(__version__)')"
+          test "$api_version" = "$EXPECTED_VERSION"
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -49,9 +61,9 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           flavor: latest=false
           tags: |
-            type=raw,value=0.1.0-rc.2
+            type=raw,value=1.0.0
             type=raw,value=sha-${{ github.sha }}
-      - name: Build and push candidate
+      - name: Build and push release
         id: push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -121,15 +133,20 @@ jobs:
           path: sbom.spdx.json
           if-no-files-found: error
           retention-days: 90
-      - name: Create GitHub prerelease
+      - name: Create stable GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
         shell: bash
         run: |
           set -euo pipefail
-          printf "Public image: \`%s@%s\`\n" "${REGISTRY}/${IMAGE_NAME}" "$IMAGE_DIGEST" > release-notes.md
-          printf '\nSynthetic public reference candidate only; not production approved.\n' >> release-notes.md
+          cp docs/release-notes-v1.0.0.md release-notes.md
+          {
+            printf '\n### Published artifact\n\n'
+            printf -- "- Public image: \`%s@%s\`\n" "${REGISTRY}/${IMAGE_NAME}" "$IMAGE_DIGEST"
+            printf -- "- Immutable tags: \`1.0.0\`, \`sha-%s\` (no \`latest\`)\n" "$GITHUB_SHA"
+            printf -- "- Attached asset: \`sbom.spdx.json\`\n"
+          } >> release-notes.md
           gh release create "$GITHUB_REF_NAME" sbom.spdx.json \
-            --verify-tag --prerelease --title "$GITHUB_REF_NAME" \
+            --verify-tag --title "$GITHUB_REF_NAME" \
             --notes-file release-notes.md

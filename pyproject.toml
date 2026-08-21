@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "responsible-ai-banking-agent"
-version = "0.2.0.dev0"
+version = "1.0.0"
 description = "Synthetic human-supervised responsible AI banking reference app"
 readme = "README.md"
 requires-python = ">=3.12,<3.15"

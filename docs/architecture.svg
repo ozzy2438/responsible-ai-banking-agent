@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 760" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b82"/>
+    </marker>
+    <marker id="arrowDashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a9bb4"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="980" height="760" fill="#f4f7fb"/>
+  <text x="490" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="#17233b">Responsible AI Banking Agent &#8212; control flow</text>
+  <text x="490" y="56" text-anchor="middle" font-size="12.5" fill="#5b6b82">Risk, authorization, evidence selection, escalation, and audit are deterministic code &#8212; not model output.</text>
+
+  <!-- Actors -->
+  <g>
+    <rect x="60" y="82" width="210" height="52" rx="8" fill="#ffffff" stroke="#d7dee8"/>
+    <text x="165" y="103" text-anchor="middle" font-size="13" font-weight="700" fill="#17233b">Customer (browser)</text>
+    <text x="165" y="121" text-anchor="middle" font-size="11" fill="#5b6b82">synthetic persona &#183; /demo</text>
+  </g>
+  <g>
+    <rect x="710" y="82" width="210" height="52" rx="8" fill="#ffffff" stroke="#d7dee8"/>
+    <text x="815" y="103" text-anchor="middle" font-size="13" font-weight="700" fill="#17233b">Reviewer / compliance</text>
+    <text x="815" y="121" text-anchor="middle" font-size="11" fill="#5b6b82">/review/escalations</text>
+  </g>
+  <line x1="165" y1="134" x2="330" y2="168" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="815" y1="134" x2="650" y2="168" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- FastAPI boundary -->
+  <rect x="80" y="170" width="820" height="64" rx="8" fill="#eaf1fb" stroke="#c4d8f2"/>
+  <text x="490" y="196" text-anchor="middle" font-size="13" font-weight="700" fill="#0d3a7d">FastAPI request boundary</text>
+  <text x="490" y="216" text-anchor="middle" font-size="11" fill="#0d3a7d">allow-listed hosts &#183; body limits &#183; PostgreSQL/in-memory rate limiting &#183; CSP &amp; security headers &#183; OIDC or simulated auth</text>
+
+  <line x1="490" y1="234" x2="490" y2="258" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Deterministic control service -->
+  <rect x="60" y="260" width="860" height="190" rx="10" fill="#ffffff" stroke="#1450a3" stroke-width="1.5"/>
+  <text x="490" y="284" text-anchor="middle" font-size="13.5" font-weight="700" fill="#17233b">Deterministic control service</text>
+
+  <!-- steps -->
+  <g font-size="11.5" fill="#17233b">
+    <rect x="80" y="300" width="118" height="46" rx="6" fill="#f4f7fb" stroke="#d7dee8"/>
+    <text x="139" y="328" text-anchor="middle">Redact</text>
+
+    <rect x="212" y="300" width="118" height="46" rx="6" fill="#fff3d6" stroke="#f0cf80"/>
+    <text x="271" y="322" text-anchor="middle">Classify</text>
+    <text x="271" y="336" text-anchor="middle" font-size="9.5" fill="#8a5a00">LOW / MEDIUM / HIGH</text>
+
+    <rect x="344" y="300" width="118" height="46" rx="6" fill="#f4f7fb" stroke="#d7dee8"/>
+    <text x="403" y="328" text-anchor="middle">Authorize</text>
+
+    <rect x="476" y="300" width="118" height="46" rx="6" fill="#f4f7fb" stroke="#d7dee8"/>
+    <text x="535" y="322" text-anchor="middle">Retrieve</text>
+    <text x="535" y="336" text-anchor="middle" font-size="9.5" fill="#5b6b82">cited evidence</text>
+
+    <rect x="608" y="300" width="118" height="46" rx="6" fill="#f4f7fb" stroke="#d7dee8"/>
+    <text x="667" y="322" text-anchor="middle">Validate</text>
+    <text x="667" y="336" text-anchor="middle" font-size="9.5" fill="#5b6b82">authority + citations</text>
+
+    <rect x="740" y="300" width="118" height="46" rx="6" fill="#f4f7fb" stroke="#d7dee8"/>
+    <text x="799" y="328" text-anchor="middle">Audit</text>
+
+    <line x1="198" y1="323" x2="212" y2="323" stroke="#5b6b82" marker-end="url(#arrow)"/>
+    <line x1="330" y1="323" x2="344" y2="323" stroke="#5b6b82" marker-end="url(#arrow)"/>
+    <line x1="462" y1="323" x2="476" y2="323" stroke="#5b6b82" marker-end="url(#arrow)"/>
+    <line x1="594" y1="323" x2="608" y2="323" stroke="#5b6b82" marker-end="url(#arrow)"/>
+    <line x1="726" y1="323" x2="740" y2="323" stroke="#5b6b82" marker-end="url(#arrow)"/>
+  </g>
+
+  <text x="490" y="368" text-anchor="middle" font-size="11" fill="#5b6b82">A reasoning provider may improve wording from already-redacted, already-authorized evidence.</text>
+  <text x="490" y="384" text-anchor="middle" font-size="11" font-weight="700" fill="#17233b">It cannot lower risk, widen access, choose tools, or change the disposition below.</text>
+
+  <!-- optional adapters, dashed -->
+  <rect x="80" y="398" width="380" height="40" rx="6" fill="none" stroke="#8a9bb4" stroke-dasharray="4 3"/>
+  <text x="270" y="422" text-anchor="middle" font-size="10.5" fill="#5b6b82">optional &#8226; deterministic stub (default) or OpenAI Responses adapter</text>
+
+  <rect x="500" y="398" width="380" height="40" rx="6" fill="none" stroke="#8a9bb4" stroke-dasharray="4 3"/>
+  <text x="690" y="422" text-anchor="middle" font-size="10.5" fill="#5b6b82">optional &#8226; read-only bank API adapter, off by default (synthetic data used)</text>
+
+  <line x1="270" y1="450" x2="270" y2="474" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="710" y1="450" x2="710" y2="474" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- outcomes -->
+  <rect x="80" y="476" width="380" height="58" rx="8" fill="#e6f6ee" stroke="#17743f"/>
+  <text x="270" y="500" text-anchor="middle" font-size="13" font-weight="700" fill="#17743f">Answered</text>
+  <text x="270" y="518" text-anchor="middle" font-size="10.5" fill="#17743f">cited synthetic facts &#183; uncertainty shown when unsupported</text>
+
+  <rect x="520" y="476" width="380" height="58" rx="8" fill="#fde8e6" stroke="#a3241c"/>
+  <text x="710" y="500" text-anchor="middle" font-size="13" font-weight="700" fill="#a3241c">Escalated</text>
+  <text x="710" y="518" text-anchor="middle" font-size="10.5" fill="#a3241c">no autonomous decision &#183; routed with full context</text>
+
+  <line x1="710" y1="534" x2="710" y2="558" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <rect x="520" y="560" width="380" height="46" rx="8" fill="#ffffff" stroke="#d7dee8"/>
+  <text x="710" y="588" text-anchor="middle" font-size="11.5" fill="#17233b">Reviewer console &#8212; acknowledge / route / close</text>
+
+  <!-- postgres -->
+  <line x1="270" y1="534" x2="270" y2="558" stroke="#5b6b82" stroke-width="1.5"/>
+  <line x1="270" y1="558" x2="450" y2="672" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="710" y1="606" x2="710" y2="672" stroke="#5b6b82" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="400" y1="323" x2="400" y2="690" stroke="#8a9bb4" stroke-width="1" stroke-dasharray="3 3" opacity="0"/>
+
+  <rect x="290" y="674" width="400" height="66" rx="10" fill="#ffffff" stroke="#1450a3" stroke-width="1.5"/>
+  <text x="490" y="698" text-anchor="middle" font-size="13" font-weight="700" fill="#0d3a7d">PostgreSQL 16</text>
+  <text x="490" y="716" text-anchor="middle" font-size="10.5" fill="#5b6b82">synthetic customers / accounts / transactions &#183; append-only audit &amp; escalation log</text>
+  <text x="490" y="730" text-anchor="middle" font-size="9.5" fill="#8a9bb4">migration role owns writes &#183; app role gets allow-listed function execution only</text>
+</svg>

@@ -234,6 +234,7 @@ make a live model call.
 - [System card](docs/system-card.md) &middot; [Architecture](docs/architecture.md) &middot; [Threat model](docs/threat-model.md)
 - [Delivery controls](docs/delivery.md) &mdash; CI jobs, RC publication, SBOM, attestation verification
 - [Production readiness roadmap](docs/production-readiness-roadmap.md) &middot; [Assurance handoff](docs/assurance-handoff.md)
+- [v1.0.0 release-candidate plan](docs/release-candidate-v1.0.0-plan.md) &mdash; draft only; not yet applied or tagged
 - [Synthetic data](docs/synthetic-data.md) &mdash; the 305-customer generated dataset used for local development, demos, and stress testing
 - [Demo script](docs/demo-script.md)
 

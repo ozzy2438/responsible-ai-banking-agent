@@ -22,8 +22,8 @@ enforces. Every request runs through a fixed, testable pipeline before a
 model ever sees it, and the model's only job is wording: it cannot lower
 risk, widen data access, choose a tool, or change whether a human gets
 involved. That boundary is the entire point of the project, and it's proven
-by 94 automated tests and 11 blocking CI gates on every commit, not just
-described in this README.
+by 96 automated tests and 11 blocking CI gates on every push and pull
+request, not just described in this README.
 
 ## Quick start &mdash; one command
 
@@ -36,7 +36,10 @@ docker compose up --build
 This builds the app image, starts PostgreSQL, runs migrations, seeds four
 demo identities, and serves the app at **http://localhost:8000/**. Nothing
 here is a manual step: no `.env` copying, no separate migration command, no
-account setup. Stop it with `make demo-down` (or `docker compose down`).
+account setup. Both published ports bind to loopback only. The demo database
+is intentionally ephemeral, so stopping the stack with `make demo-down` (or
+`docker compose down`) removes all synthetic sessions and review cases and
+the next start is deterministic.
 
 Pick a persona on the landing page &mdash; no password, just a click:
 
@@ -128,9 +131,13 @@ interpretation only), and
 ```sh
 make lint       # ruff format --check, ruff check
 make typecheck  # mypy --strict
-make test       # 94 tests: unit, PostgreSQL integration, policy evaluation
+make test       # local suites; PostgreSQL tests require the URLs documented below
 make verify     # all three
 ```
+
+CI runs all **96 tests**. A plain local `make test` runs unit and policy
+tests, and runs the PostgreSQL integration suite when `TEST_DATABASE_URL`
+and `MIGRATION_DATABASE_URL` are configured as shown in Local development.
 
 Every push and pull request runs **11 blocking CI gates**: repository
 hygiene, Ruff + strict typing, unit tests, PostgreSQL integration tests,
@@ -141,13 +148,15 @@ full commit SHAs; see [docs/delivery.md](docs/delivery.md) for the exact
 gate list and how release-candidate images are published with SBOM and
 build-provenance attestations.
 
-The 94 tests break down as: 11 unit test modules covering risk
+The 96 tests break down as: 11 unit test modules covering risk
 classification, redaction, identity (simulated + OIDC), bank-data adapters,
 rate limiting, observability, configuration, and the API surface (including
 the demo UI routes); PostgreSQL integration tests covering migrations,
-concurrent idempotency, immutable audit, cross-customer isolation, the
-one-command demo journeys, and 30 extended scenario cases against real
-seeded data (see [docs/synthetic-data.md](docs/synthetic-data.md)); and the
+concurrent idempotency, immutable audit, cross-customer isolation, HTTP demo
+journeys, and 30 extended scenario cases against real seeded data (see
+[docs/synthetic-data.md](docs/synthetic-data.md)); the blocking container
+smoke separately starts the packaged Compose stack twice and exercises the
+customer and reviewer flows through its published HTTP port; and the
 fixed 48-case policy evaluation corpus with 100% required pass rate on every
 high-risk and privacy case.
 
@@ -193,7 +202,7 @@ people can close.
   externally served, same-origin JS rather than weakening the security
   policy &mdash; and added a regression test asserting the CSP header never
   regains `unsafe-inline` for scripts.
-- Took an existing backend-only reference app to a one-command,
+- Took an existing backend-only reference app to a loopback-only, one-command,
   fully-scripted demo (`make demo` / `docker compose up --build`) with a
   polished customer and reviewer UI, without introducing a frontend
   framework or weakening any existing control.
@@ -234,7 +243,7 @@ make a live model call.
 - [System card](docs/system-card.md) &middot; [Architecture](docs/architecture.md) &middot; [Threat model](docs/threat-model.md)
 - [Delivery controls](docs/delivery.md) &mdash; CI jobs, RC publication, SBOM, attestation verification
 - [Production readiness roadmap](docs/production-readiness-roadmap.md) &middot; [Assurance handoff](docs/assurance-handoff.md)
-- [v1.0.0 release-candidate plan](docs/release-candidate-v1.0.0-plan.md) &mdash; draft only; not yet applied or tagged
+- [v1.0.0 stable-release readiness plan](docs/release-candidate-v1.0.0-plan.md) &mdash; draft only; not yet applied or tagged
 - [Synthetic data](docs/synthetic-data.md) &mdash; the 305-customer generated dataset used for local development, demos, and stress testing
 - [Demo script](docs/demo-script.md)
 

@@ -14,7 +14,7 @@ cues below. Times are approximate.
 | 0:55&ndash;1:10 | Click the **HIGH** scenario (financial hardship) | "Anything regulated &mdash; credit, fraud, hardship, legal &mdash; always escalates. Notice it says 'no autonomous decision has been made,' and it creates a real escalation record for a human reviewer." |
 | 1:10&ndash;1:25 | Click the **prompt injection** scenario | "Someone tries to override the rules directly. Same result: it fails closed and escalates instead of complying &mdash; deterministic code decides this, not the model being asked nicely." |
 | 1:25&ndash;1:45 | Switch persona to **Riley Reviewer**, open the reviewer queue | "A human reviewer sees the redacted request, the risk reason, and the route. They can acknowledge, route to a specialist team, or close &mdash; the system never resolves a HIGH-risk case on its own." |
-| 1:45&ndash;2:00 | Scroll to footer / GitHub link | "Full source, 87 automated tests, and 11 green CI gates &mdash; lint, strict typing, container smoke, dependency, secret, static, and image scans &mdash; are all on GitHub." |
+| 1:45&ndash;2:00 | Scroll to footer / GitHub link | "Full source, 96 automated tests, and 11 green CI gates &mdash; lint, strict typing, a full-stack Compose smoke, dependency, secret, static, and image scans &mdash; are all on GitHub." |
 
 ## Shot list (if recording separately from narration)
 

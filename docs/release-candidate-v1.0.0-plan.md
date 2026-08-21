@@ -1,36 +1,36 @@
-# v1.0.0 Release Candidate &mdash; Readiness Plan (DRAFT, NOT APPLIED)
+# v1.0.0 Stable Release &mdash; Readiness Plan (DRAFT, NOT APPLIED)
 
 **Status: proposal only.** Nothing in this document has been executed. No
-tag has been created, no workflow file has been changed, and no GitHub
+tag has been created, the release workflow has not been changed, and no GitHub
 release or GHCR image has been published. It exists so the repository
 owner has one place to review exactly what publishing `v1.0.0` would
-involve, and to give the one approval required before any of it happens.
+involve and which approvals are required before anything publishes.
 
 ## What "release" means here
 
-Same definition as the rest of this repository: a **synthetic, portfolio
-reference candidate**, not a production deployment, not a compliance
+Same definition as the rest of this repository: a **synthetic portfolio
+reference release**, not a production deployment, not a compliance
 certification, and not evidence of real-bank approval. The existing
-`docs/delivery.md` release-evidence language (SBOM, attestations, digest
-pinning, no `latest` tag) applies unchanged.
+`docs/delivery.md` release controls (SBOM, attestations, digest pinning, no
+`latest` tag) remain required, but its RC2-specific wording must be updated in
+the future release-preparation commit described below.
 
-## Blocking technical issue found during review
+## Blocking release-preparation work
 
-`.github/workflows/release.yml` is currently hardcoded to the exact string
-`v0.1.0-rc.2` in two places:
+The current repository cannot publish a correct stable `v1.0.0` tag yet:
 
-1. `on.push.tags` &mdash; only a `v0.1.0-rc.2` tag push triggers the workflow
-   at all.
-2. The `Enforce the authorised release candidate tag` step: `test
-   "$GITHUB_REF_NAME" = "v0.1.0-rc.2"`, which fails the job closed for any
-   other tag even if the workflow were somehow invoked.
+1. `.github/workflows/release.yml` triggers and authorises only
+   `v0.1.0-rc.2`.
+2. `pyproject.toml` and the API identify the current development build as
+   `0.2.0.dev0`, not `1.0.0`.
+3. The workflow creates a GitHub prerelease. A stable `v1.0.0` must not use
+   `--prerelease`.
+4. The release notes emitted by the workflow are RC2-specific and do not yet
+   use the reviewed stable notes below.
 
-**A `v1.0.0` tag pushed today would not trigger a release, and if the
-trigger were changed but not this check, the job would fail closed at that
-step.** This is deliberate fail-closed design from the RC2 work, not a bug
-&mdash; it just needs to be re-pointed at the new candidate tag before
-`v1.0.0` can be published. The minimal, in-place edit (not applied) would
-be:
+**A `v1.0.0` tag pushed today would not publish a release.** This is deliberate
+fail-closed design from RC2. A separate release-preparation commit must make
+all of the following changes together before any tag exists (not applied):
 
 ```diff
  on:
@@ -51,28 +51,42 @@ be:
 -            type=raw,value=0.1.0-rc.2
 +            type=raw,value=1.0.0
              type=raw,value=sha-${{ github.sha }}
+
+ pyproject.toml:
+-  version = "0.2.0.dev0"
++  version = "1.0.0"
+
+ release command:
+-  gh release create ... --prerelease ...
++  gh release create ... --notes-file docs/release-notes-v1.0.0.md ...
 ```
 
-No other logic changes: still SHA-pinned Actions, still no `latest` tag,
-still SBOM + provenance + SBOM attestation on the exact digest, still a
-smoke test against the exact published digest before the GitHub release is
-created.
+The release preparation must also add a blocking tag/package/API version
+equality check and update `docs/delivery.md` from RC2-specific wording. All
+other controls remain unchanged: SHA-pinned Actions, no `latest` tag, SBOM,
+provenance and SBOM attestations on the exact digest, and a smoke test against
+that published digest before creating the GitHub release.
 
-## Readiness checklist against the exact candidate commit
+## Readiness checklist against the exact release commit
 
-Once the owner names the exact commit SHA to release (expected to be this
-PR's merge commit on `main`, or `fa5b650fbf5d59c78401b8e0b1e44e026d983cd2`
-if released pre-merge from this branch):
+The release SHA must be a merge commit on protected `main` that already
+contains the approved release workflow, `1.0.0` package version, stable notes,
+and all documentation updates. Do not tag this feature branch, its current
+head, or an earlier pre-merge SHA: GitHub executes the workflow stored in the
+tagged commit.
 
-- [x] All 11 blocking CI gates pass on that commit (repository hygiene,
+- [ ] All 11 blocking CI gates pass on the exact release-preparation commit
+      (repository hygiene,
       Ruff + strict typing, unit tests, PostgreSQL integration, policy
       evaluations, container smoke, dependency audit, secret scan, static
       security scan, filesystem vulnerability scan, image vulnerability
-      scan) &mdash; confirmed green on PR #12, both workflow attempts, 0
-      failures.
-- [ ] `release.yml` re-pointed at `v1.0.0` (diff above) &mdash; **not yet
-      applied, pending owner approval.**
-- [ ] Exact commit SHA for the tag confirmed by the owner.
+      scan). Feature-branch CI is supporting evidence only; this item remains
+      unchecked until those gates pass on the future release SHA.
+- [ ] Package and API version set to `1.0.0`; workflow re-pointed to
+      `v1.0.0`; prerelease mode removed; reviewed notes wired in; and
+      tag/version equality gate added &mdash; **not yet applied, pending owner
+      approval.**
+- [ ] Exact protected-`main` commit SHA for the tag confirmed by the owner.
 - [ ] Tag `v1.0.0` created and pushed &mdash; **not yet done, pending owner
       approval.**
 - [ ] Release workflow republishes CI gates, then builds and pushes the
@@ -84,7 +98,7 @@ if released pre-merge from this branch):
       before the release is created.
 - [ ] Published digest pulled and smoke-tested (`/healthz`) before the
       GitHub release is created &mdash; matches the existing RC2 smoke step.
-- [ ] GitHub prerelease/release created from the verified tag, with
+- [ ] Stable GitHub release created from the verified tag, with
       release notes drafted below.
 - [ ] Quick-start instructions re-verified against the published image
       (not just the local build) before announcing the release.
@@ -98,7 +112,7 @@ Synthetic, human-supervised banking assistant reference implementation.
 Deterministic risk classification, authorization, redaction, cited
 evidence, and mandatory human escalation run as code, not as prompts.
 
-**This is a portfolio reference candidate only.** It is not deployed by,
+**This is a portfolio reference release only.** It is not deployed by,
 or affiliated with, any real bank; not certified as legally or
 regulatorily compliant; not connected to real customer data; and not
 authorized to move money or make an autonomous credit, fraud, or hardship
@@ -110,13 +124,15 @@ still require.
 
 - One-command demo: `make demo` / `docker compose up --build` builds the
   app, starts PostgreSQL, runs migrations, seeds four synthetic demo
-  identities, and serves the app &mdash; no manual setup.
+  identities, and serves the app on loopback-only ports &mdash; no manual
+  setup. Demo database state is ephemeral and recreated with the stack.
 - A customer-facing landing page and assistant UI with four prepared
   scenarios (LOW, MEDIUM, HIGH, prompt-injection), plus a visually
   refreshed reviewer console.
-- End-to-end automated coverage of the full demo journeys (customer
-  assistant flow and reviewer acknowledge/route/close flow) in addition to
-  the existing unit, integration, and 48-case policy evaluation suites.
+- A blocking full-stack Compose HTTP smoke that starts the packaged app and
+  PostgreSQL, verifies the customer answer/escalation path and reviewer
+  route/close path, recreates the stack, and runs the journey again, in
+  addition to the unit, integration, and 48-case policy evaluation suites.
 - An architecture diagram, real screenshots, a 90&ndash;120s demo script,
   and a rewritten, CV-ready README.
 
@@ -124,8 +140,8 @@ still require.
 
 - Public image: `ghcr.io/ozzy2438/responsible-ai-banking-agent@<digest>`
   (immutable digest; also tagged `1.0.0` and `sha-<commit>`, no `latest`).
-- SPDX JSON SBOM and GitHub build-provenance + SBOM attestations attached
-  to this release; verify with:
+- SPDX JSON SBOM published as a release asset, with GitHub build-provenance
+  and SBOM attestations bound to the exact OCI image digest; verify with:
   ```sh
   gh attestation verify \
     oci://ghcr.io/ozzy2438/responsible-ai-banking-agent@<digest> \
@@ -134,14 +150,16 @@ still require.
 - 11/11 blocking CI gates passing on the released commit; see the linked
   workflow run.
 
-Synthetic public reference candidate only; not production approved.
+Synthetic public reference release only; not production approved.
 ```
 
-## The one approval needed
+## Owner approvals needed
 
 Everything above is ready to execute except two owner decisions:
 
-1. **Confirm the exact commit** to release (this PR's merge commit on
-   `main` once merged, or a specific SHA if released pre-merge).
-2. **Approve applying the `release.yml` diff above and pushing the
-   `v1.0.0` tag.** Nothing publishes until both of those happen.
+1. **Approve the release-preparation change** (workflow, `1.0.0` version,
+   stable notes, delivery docs, and tag/version gate) after this feature PR is
+   merged.
+2. **Confirm the resulting protected-`main` SHA and separately approve
+   pushing the `v1.0.0` tag.** Nothing publishes until both approvals and a
+   green exact-SHA CI run exist.

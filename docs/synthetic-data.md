@@ -33,7 +33,8 @@ on wall-clock time or process entropy. Regenerate with:
 Once `0003_synthetic_seed_data.sql` has been applied anywhere, treat it as
 immutable like any other migration — `migrate()` hash-checks applied
 migrations and raises if a previously applied file changes. A future change
-to the seed data is a new migration (`0004_...`), not an edit to `0003`.
+to the seed data is a new numbered migration (for example, `0006_...`), not
+an edit to `0003`.
 
 ## Named edge-case fixtures
 

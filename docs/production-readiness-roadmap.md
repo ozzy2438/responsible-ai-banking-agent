@@ -9,10 +9,11 @@
 
 ## Where this sits
 
-`v0.1.0-rc.2` is a technically verified, synthetic-data-only reference
-candidate: CI, security scanning, SBOM, and provenance attestation pass on a
-pinned commit. That is evidence about the tested commit. It is not a
-production deployment, legal approval, or compliance finding — see
+`v1.0.0` is the stable synthetic-data-only portfolio release line. Its
+controlled publication workflow reruns CI and security scanning, then binds
+an SBOM and provenance attestations to the exact image digest. That is evidence
+about the tested artifact. It is not a production deployment, legal approval,
+or compliance finding — see
 [the evidence language in the README](../README.md#evidence-language) and
 [known limitations in the system card](system-card.md#known-limitations).
 

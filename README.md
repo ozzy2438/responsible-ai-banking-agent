@@ -145,7 +145,7 @@ policy evaluations (the fixed 48-case safety corpus), container smoke,
 dependency audit, secret scan, static security scan, filesystem
 vulnerability scan, and container image vulnerability scan. All pinned to
 full commit SHAs; see [docs/delivery.md](docs/delivery.md) for the exact
-gate list and how release-candidate images are published with SBOM and
+gate list and how release images are published with SBOM and
 build-provenance attestations.
 
 The 96 tests break down as: 11 unit test modules covering risk
@@ -241,9 +241,9 @@ make a live model call.
 ## Further reading
 
 - [System card](docs/system-card.md) &middot; [Architecture](docs/architecture.md) &middot; [Threat model](docs/threat-model.md)
-- [Delivery controls](docs/delivery.md) &mdash; CI jobs, RC publication, SBOM, attestation verification
+- [Delivery controls](docs/delivery.md) &mdash; CI jobs, release publication, SBOM, attestation verification
 - [Production readiness roadmap](docs/production-readiness-roadmap.md) &middot; [Assurance handoff](docs/assurance-handoff.md)
-- [v1.0.0 stable-release readiness plan](docs/release-candidate-v1.0.0-plan.md) &mdash; draft only; not yet applied or tagged
+- [v1.0.0 release runbook](docs/release-candidate-v1.0.0-plan.md)
 - [Synthetic data](docs/synthetic-data.md) &mdash; the 305-customer generated dataset used for local development, demos, and stress testing
 - [Demo script](docs/demo-script.md)
 

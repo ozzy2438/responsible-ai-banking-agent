@@ -27,7 +27,7 @@ banking-agent-identities = "responsible_banking_agent.identity:main"
 [project.optional-dependencies]
 test = [
   "bandit>=1.8,<2",
-  "mypy>=1.17,<2",
+  "mypy>=1.17,<3",
   "pip-audit>=2.9,<3",
   "pytest>=8.4,<10",
   "pytest-cov>=6.2,<8",

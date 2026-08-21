@@ -138,6 +138,36 @@ def test_review_actions_are_controlled_and_immutable() -> None:
         escalation_summary="Human lending review required",
     )
     assert stored.escalation_id
+    with psycopg.connect(settings.database_url) as connection:
+        for invalid_destination in ("unapproved_destination", None, ""):
+            invalid_route = connection.execute(
+                "SELECT record_review_action(%s, %s, %s, %s, %s)",
+                (
+                    stored.escalation_id,
+                    reviewer,
+                    "route",
+                    invalid_destination,
+                    "This route is not allow-listed",
+                ),
+            ).fetchone()
+            assert invalid_route and invalid_route[0] is False
+    with psycopg.connect(settings.migration_database_url) as connection:
+        unchanged = connection.execute(
+            "SELECT status FROM escalations WHERE id = %s", (stored.escalation_id,)
+        ).fetchone()
+        action_count = connection.execute(
+            "SELECT count(*) FROM review_actions WHERE escalation_id = %s",
+            (stored.escalation_id,),
+        ).fetchone()
+        audit_count = connection.execute(
+            "SELECT count(*) FROM audit_events "
+            "WHERE request_id = %s AND event_type = 'review_action'",
+            (stored.request_id,),
+        ).fetchone()
+    assert unchanged and unchanged[0] == "open"
+    assert action_count and action_count[0] == 0
+    assert audit_count and audit_count[0] == 0
+
     repository.record_review_action(
         escalation_id=stored.escalation_id,
         actor_id=reviewer,
@@ -146,7 +176,26 @@ def test_review_actions_are_controlled_and_immutable() -> None:
         reason="Specialist review required",
     )
     queue = repository.list_escalations()
-    assert any(item["id"] == str(stored.escalation_id) for item in queue)
+    routed = next(item for item in queue if item["id"] == str(stored.escalation_id))
+    assert routed["status"] == "routed"
+    assert routed["route"] == EscalationRoute.LENDING_SPECIALIST.value
+
+    repository.record_review_action(
+        escalation_id=stored.escalation_id,
+        actor_id=reviewer,
+        action="close",
+        route=None,
+        reason="Controlled review completed",
+    )
+    assert all(item["id"] != str(stored.escalation_id) for item in repository.list_escalations())
+    with pytest.raises(KeyError):
+        repository.record_review_action(
+            escalation_id=stored.escalation_id,
+            actor_id=reviewer,
+            action="acknowledge",
+            route=None,
+            reason="A closed review cannot be reopened",
+        )
 
     with (
         psycopg.connect(settings.migration_database_url) as connection,

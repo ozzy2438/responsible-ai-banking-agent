@@ -11,6 +11,7 @@ from responsible_banking_agent.identity import IdentityStore
 from responsible_banking_agent.models import AssistResponse, EscalationRoute
 from responsible_banking_agent.rate_limit import InMemoryRateLimiter, RateLimiter
 from responsible_banking_agent.repository import AccountRecord, TransactionRecord
+from responsible_banking_agent.version import __version__
 
 ALICE_ID = UUID("11111111-1111-4111-8111-111111111111")
 BOB_ID = UUID("22222222-2222-4222-8222-222222222222")
@@ -59,6 +60,7 @@ class FakeRepository:
                 "status": "open",
                 "summary": "Synthetic review case",
                 "redacted_message": "Help with my account",
+                "risk_level": "HIGH",
             }
         ]
 
@@ -229,6 +231,16 @@ def test_health_readiness_and_validation_failures() -> None:
         json={"action": "route", "reason": "Route this case"},
     )
     assert route_without_target.status_code == 422
+    route_on_close = client.post(
+        "/v1/reviewer/escalations/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee/actions",
+        headers={"Authorization": "Bearer reviewer-test-token"},
+        json={
+            "action": "close",
+            "route": "hardship",
+            "reason": "Route must not be accepted here",
+        },
+    )
+    assert route_on_close.status_code == 422
 
     validation_secret = "must-not-be-echoed-123"
     invalid = client.post(
@@ -276,3 +288,76 @@ def test_request_boundary_enforces_ids_hosts_body_limits_and_rate_limits() -> No
 
     invalid_host = oversized_client.get("/healthz", headers={"Host": "evil.example"})
     assert invalid_host.status_code == 400
+
+
+def test_landing_and_static_assets_are_public() -> None:
+    client, _ = _client()
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert "Alice Example" in landing.text
+    assert landing.headers["content-security-policy"] == (
+        "default-src 'self'; style-src 'self' 'unsafe-inline'"
+    )
+    assert 'id="persona-error" role="alert" aria-live="assertive"' in landing.text
+
+    script = client.get("/static/landing.js")
+    assert script.status_code == 200
+    assert "/dev/login" in script.text
+
+
+def test_demo_page_requires_sign_in_and_reflects_known_account() -> None:
+    client, _ = _client()
+    signed_out = client.get("/demo", follow_redirects=False)
+    assert signed_out.status_code == 303
+    assert signed_out.headers["location"] == "/"
+
+    client.post("/dev/login", json={"alias": "alice"})
+    alice_demo = client.get("/demo")
+    assert alice_demo.status_code == 200
+    assert str(ACCOUNT_ID) in alice_demo.text
+    assert 'id="response-card" class="card" role="status"' in alice_demo.text
+    assert 'id="assist-error" role="alert" aria-live="assertive"' in alice_demo.text
+
+    client.cookies.clear()
+    client.post("/dev/login", json={"alias": "reviewer"})
+    reviewer_demo = client.get("/demo")
+    assert reviewer_demo.status_code == 200
+    assert str(ACCOUNT_ID) not in reviewer_demo.text
+
+
+def test_openapi_version_matches_installed_package() -> None:
+    client, _ = _client()
+    assert client.get("/openapi.json").json()["info"]["version"] == __version__
+
+
+def test_passwordless_demo_is_hidden_outside_local_and_test() -> None:
+    settings = Settings(
+        app_env="staging",
+        identity_provider="oidc",
+        reasoning_provider="stub",
+        database_url="postgresql://unused",
+        migration_database_url="",
+        app_db_password="",
+        identities_file=Path("unused"),
+        policy_bundle_path=Path("policies"),
+        openai_api_key=None,
+        openai_model=None,
+        oidc_issuer="https://identity.example.test",
+        oidc_audience="responsible-banking-agent",
+        oidc_jwks_url="https://identity.example.test/.well-known/jwks.json",
+    )
+    client = TestClient(
+        create_app(
+            settings,
+            FakeRepository(),
+            rate_limiter=InMemoryRateLimiter(requests=100, window_seconds=60),
+        )
+    )
+
+    landing = client.get("/")
+    assert landing.status_code == 200
+    assert "Local demo disabled" in landing.text
+    assert "Alice Example" not in landing.text
+    assert "/static/landing.js" not in landing.text
+    assert client.get("/demo").status_code == 404
+    assert client.post("/dev/login", json={"alias": "alice"}).status_code == 404

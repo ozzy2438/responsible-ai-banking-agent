@@ -6,14 +6,56 @@ services:
       POSTGRES_USER: banking_migration
       POSTGRES_PASSWORD: migration-local-only
     ports:
-      - "55440:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-55440}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U banking_migration -d banking"]
       interval: 2s
       timeout: 3s
       retries: 20
-    volumes:
-      - banking-data:/var/lib/postgresql/data
+    # Demo state is intentionally ephemeral. Recreating the stack always
+    # reapplies the immutable synthetic fixtures with fresh evidence timestamps.
+    tmpfs:
+      - /var/lib/postgresql/data
 
-volumes:
-  banking-data:
+  # One-command synthetic demo. Not a production deployment: local-only
+  # secrets, in-memory rate limiting, and simulated identities (see
+  # docs/production-configuration.md for the fail-closed production path).
+  app:
+    build:
+      context: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: local
+      IDENTITY_PROVIDER: simulated
+      REASONING_PROVIDER: stub
+      SECRET_SOURCE: env
+      DATABASE_URL: postgresql://banking_app:app-local-only@postgres:5432/banking
+      MIGRATION_DATABASE_URL: postgresql://banking_migration:migration-local-only@postgres:5432/banking
+      APP_DB_PASSWORD: app-local-only
+      SESSION_COOKIE_SECURE: "false"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      LOG_FORMAT: text
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.local:uid=10001,gid=10001,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Migrate the schema, seed local-only demo identities (gitignored,
+    # regenerated on every start), then serve. Synthetic data only.
+    command: >
+      sh -c "banking-agent-migrate &&
+             banking-agent-identities &&
+             exec uvicorn responsible_banking_agent.app:create_app --factory --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s

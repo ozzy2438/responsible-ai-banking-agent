@@ -123,35 +123,35 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
-      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          load: true
-          tags: responsible-banking-agent:ci
-      - name: Run as non-root and smoke health endpoint
+      - name: Validate browser JavaScript syntax
+        run: |
+          node --check src/responsible_banking_agent/static/landing.js
+          node --check src/responsible_banking_agent/static/demo.js
+      - name: Validate and start the packaged demo stack
         shell: bash
         run: |
           set -euo pipefail
-          docker run -d --name responsible-banking-smoke \
-            --read-only --tmpfs /tmp --tmpfs /app/.local:uid=10001,gid=10001,mode=0700 \
-            -p 18000:8000 \
-            -e APP_ENV=test -e IDENTITY_PROVIDER=simulated -e REASONING_PROVIDER=stub \
-            -e DATABASE_URL=postgresql://unused -e POLICY_BUNDLE_PATH=policies \
-            -e SESSION_COOKIE_SECURE=false \
-            responsible-banking-agent:ci /bin/sh -c \
-            'banking-agent-identities && exec uvicorn responsible_banking_agent.app:create_app --factory --host 0.0.0.0 --port 8000'
-          test "$(docker inspect -f '{{.Config.User}}' responsible-banking-smoke)" = "10001:10001"
-          for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:18000/healthz; then exit 0; fi
-            echo "Waiting for container health (${attempt}/30)"
-            sleep 1
-          done
-          docker logs responsible-banking-smoke
-          exit 1
-      - name: Remove smoke container
+          docker compose config --quiet
+          docker compose up --build --detach --wait
+          app_container="$(docker compose ps --quiet app)"
+          test "$(docker inspect -f '{{.Config.User}}' "$app_container")" = "10001:10001"
+          python3 scripts/demo_smoke.py
+      - name: Prove a recreated demo does not reuse stale evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose exec -T postgres psql \
+            --username banking_migration --dbname banking --set ON_ERROR_STOP=1 \
+            --command "UPDATE accounts SET updated_at = now() - interval '2 days' WHERE id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';"
+          docker compose down --volumes --remove-orphans
+          docker compose up --detach --wait
+          python3 scripts/demo_smoke.py
+      - name: Show Compose logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Remove the synthetic demo stack
         if: always()
-        run: docker rm -f responsible-banking-smoke || true
+        run: docker compose down --volumes --remove-orphans
 
   dependency-audit:
     name: Dependency audit
@@ -164,6 +164,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+      - run: python -m pip install --upgrade pip==26.2
       - run: python -m pip install -e ".[test]"
       - run: pip-audit
 

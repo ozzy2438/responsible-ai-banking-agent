@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from fastapi import Cookie, Depends, FastAPI, Form, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
@@ -30,6 +31,7 @@ from .reasoning.openai_adapter import OpenAIResponsesAdapter
 from .reasoning.stub import DeterministicStub
 from .repository import BankingRepository, Repository
 from .service import BankingService
+from .version import __version__
 
 
 class DevLogin(BaseModel):
@@ -42,6 +44,16 @@ class ReviewAction(BaseModel):
     action: Literal["acknowledge", "route", "close"]
     route: EscalationRoute | None = None
     reason: str = Field(min_length=3, max_length=500)
+
+
+# Presentation-only lookup for the demo UI: which synthetic fixture account a
+# demo customer persona owns, so the "attach my account" scenario button can
+# pass a real, authorised account_id. Every service-layer authorization check
+# in service.py re-verifies ownership regardless of what this map contains.
+_DEMO_CUSTOMER_ACCOUNTS = {
+    UUID("11111111-1111-4111-8111-111111111111"): UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+    UUID("22222222-2222-4222-8222-222222222222"): UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+}
 
 
 def create_app(
@@ -65,12 +77,20 @@ def create_app(
     http_logger = configure_http_logger(settings.log_format)
     service = BankingService(repository, policies, provider, data_provider)
     templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
-    app = FastAPI(title="Responsible AI Banking Agent", version="0.2.0-dev")
+    app = FastAPI(title="Responsible AI Banking Agent", version=__version__)
+    app.mount(
+        "/static",
+        StaticFiles(directory=Path(__file__).parent / "static"),
+        name="static",
+    )
     app.state.settings = settings
     app.state.repository = repository
     app.state.identity_provider = identity_provider
     app.state.rate_limiter = rate_limiter
     app.state.service = service
+    demo_enabled = settings.app_env in {"local", "test"} and isinstance(
+        identity_provider, IdentityStore
+    )
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=list(settings.allowed_hosts),
@@ -167,6 +187,30 @@ def create_app(
             raise HTTPException(status_code=403, detail="Reviewer role required")
         return actor
 
+    def optional_actor(
+        authorization: Annotated[str | None, Header()] = None,
+        session_token: Annotated[str | None, Cookie()] = None,
+    ) -> Actor | None:
+        token = session_token
+        if authorization and authorization.startswith("Bearer "):
+            token = authorization[7:]
+        if not token:
+            return None
+        try:
+            return identity_provider.authenticate(token)
+        except AuthenticationError:
+            return None
+
+    @app.get("/", response_class=HTMLResponse)
+    def landing(
+        request: Request, actor: Annotated[Actor | None, Depends(optional_actor)]
+    ) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request,
+            name="landing.html",
+            context={"actor": actor, "demo_enabled": demo_enabled},
+        )
+
     @app.get("/healthz")
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -220,6 +264,8 @@ def create_app(
     ) -> Response:
         if body.action == "route" and body.route is None:
             raise HTTPException(status_code=422, detail="Route is required")
+        if body.action != "route" and body.route is not None:
+            raise HTTPException(status_code=422, detail="Route is only valid for route actions")
         try:
             repository.record_review_action(
                 escalation_id=escalation_id,
@@ -249,6 +295,21 @@ def create_app(
         )
         return response
 
+    @app.get("/demo", response_class=HTMLResponse, response_model=None)
+    def demo(
+        request: Request, actor: Annotated[Actor | None, Depends(optional_actor)]
+    ) -> HTMLResponse | RedirectResponse:
+        if not demo_enabled:
+            raise HTTPException(status_code=404)
+        if actor is None:
+            return RedirectResponse("/", status_code=303)
+        account_id = _DEMO_CUSTOMER_ACCOUNTS.get(actor.actor_id)
+        return templates.TemplateResponse(
+            request=request,
+            name="demo.html",
+            context={"actor": actor, "account_id": account_id},
+        )
+
     @app.get("/review/escalations", response_class=HTMLResponse)
     def review_page(request: Request, actor: Annotated[Actor, Depends(reviewer)]) -> HTMLResponse:
         csrf = secrets.token_urlsafe(24)
@@ -274,19 +335,31 @@ def create_app(
         reason: Annotated[str, Form(min_length=3, max_length=500)],
         csrf: Annotated[str, Form()],
         csrf_token: Annotated[str | None, Cookie()] = None,
-        route: Annotated[EscalationRoute | None, Form()] = None,
+        route: Annotated[str | None, Form()] = None,
     ) -> RedirectResponse:
         if not csrf_token or not secrets.compare_digest(csrf, csrf_token):
             raise HTTPException(status_code=403, detail="CSRF check failed")
-        if action == "route" and route is None:
+        try:
+            parsed_route = EscalationRoute(route) if route else None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid route") from exc
+        if action == "route" and parsed_route is None:
             raise HTTPException(status_code=422, detail="Route is required")
-        repository.record_review_action(
-            escalation_id=escalation_id,
-            actor_id=actor.actor_id,
-            action=action,
-            route=route,
-            reason=reason,
-        )
+        if action != "route" and parsed_route is not None:
+            raise HTTPException(status_code=422, detail="Route is only valid for route actions")
+        try:
+            repository.record_review_action(
+                escalation_id=escalation_id,
+                actor_id=actor.actor_id,
+                action=action,
+                route=parsed_route,
+                reason=reason,
+            )
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Review action is no longer valid for this escalation",
+            ) from exc
         return RedirectResponse("/review/escalations", status_code=303)
 
     return app

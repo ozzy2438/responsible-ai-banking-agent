@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Assistant demo &mdash; Responsible AI Banking Agent{% endblock %}
+{% block content %}
+  <h1>Ask the assistant</h1>
+  <p class="lede">
+    Every response below shows the deterministic risk level, disposition, and
+    citations the control layer produced &mdash; the wording may vary, the
+    decision never does.
+  </p>
+
+  <div class="card">
+    <h2>Prepared scenarios</h2>
+    <p style="color: var(--muted); font-size: .88rem; margin-top: 0;">
+      Click one to see how the assistant handles each risk tier.
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .6rem;">
+      <button type="button" class="scenario" data-scenario="low">
+        <span class="badge low">Low</span><br>
+        <small style="font-weight: 400;">General FAQ</small>
+      </button>
+      <button type="button" class="scenario secondary" data-scenario="medium" data-requires-account="true" {% if not account_id %}disabled{% endif %}>
+        <span class="badge medium">Medium</span><br>
+        <small style="font-weight: 400;">
+          {% if account_id %}My account balance{% else %}Requires a customer account{% endif %}
+        </small>
+      </button>
+      <button type="button" class="scenario secondary" data-scenario="high">
+        <span class="badge high">High</span><br>
+        <small style="font-weight: 400;">Financial hardship</small>
+      </button>
+      <button type="button" class="scenario secondary" data-scenario="privacy">
+        <span class="badge high">High</span><br>
+        <small style="font-weight: 400;">Prompt injection attempt</small>
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Or ask your own question</h2>
+    <form id="assist-form">
+      <label for="message">Message (synthetic data only &mdash; do not type real information)</label>
+      <textarea id="message" name="message" rows="2" maxlength="4000" required placeholder="e.g. What are branch opening hours?"></textarea>
+      {% if account_id %}
+        <label style="display: flex; align-items: center; gap: .5rem; font-weight: 400;">
+          <input type="checkbox" id="use-account" checked style="width: auto;">
+          Attach my synthetic account ({{ account_id }})
+        </label>
+      {% endif %}
+      <div style="margin-top: .9rem;">
+        <button type="submit" id="submit-btn">Ask the assistant</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="response-card" class="card" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" style="display: none;">
+    <h2>Response <span id="risk-badge"></span> <span id="disposition-badge" class="badge neutral"></span></h2>
+    <p id="answer-text"></p>
+    <div id="escalation-note" style="display: none; background: var(--high-bg); color: var(--high); border-radius: .4rem; padding: .6rem .8rem; font-size: .88rem; margin: .6rem 0;"></div>
+    <div id="facts-block" style="display: none;">
+      <h3 class="response-section-title">Verified facts</h3>
+      <ul class="plain" id="facts-list"></ul>
+    </div>
+    <div id="citations-block" style="display: none;">
+      <h3 class="response-section-title">Citations</h3>
+      <ul class="plain" id="citations-list"></ul>
+    </div>
+    <div id="uncertainty-block" style="display: none;">
+      <h3 class="response-section-title">Uncertainty</h3>
+      <ul class="plain" id="uncertainty-list"></ul>
+    </div>
+    <div id="next-steps-block" style="display: none;">
+      <h3 class="response-section-title">Next steps</h3>
+      <ul class="plain" id="next-steps-list"></ul>
+    </div>
+  </div>
+  <p id="assist-error" role="alert" aria-live="assertive" style="color: var(--high); display: none;"></p>
+  <div id="demo-config" data-account-id="{{ account_id or '' }}" style="display: none;"></div>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/demo.js" defer></script>
+{% endblock %}

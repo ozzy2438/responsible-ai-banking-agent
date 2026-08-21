@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Responsible AI Banking Agent &mdash; synthetic demo{% endblock %}
+{% block content %}
+  <h1>A banking assistant that knows what it isn&rsquo;t allowed to do</h1>
+  <p class="lede">
+    This reference implementation answers verified banking questions from
+    synthetic data, then deterministically routes anything regulated,
+    high-impact, uncertain, or unsupported to a human reviewer &mdash; every
+    time, by design, not by prompting.{% if demo_enabled %} Pick a synthetic
+    persona below to try it.{% endif %}
+  </p>
+
+  {% if demo_enabled %}
+  <div class="card">
+    <h2>Try it as&hellip;</h2>
+    <p style="color: var(--muted); font-size: .88rem; margin-top: 0;">
+      Each button signs you in as a prepared synthetic identity (see
+      <code>make identities</code>) &mdash; no password, no real account.
+    </p>
+    <div id="personas" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: .75rem; margin-top: .75rem;">
+      <button type="button" class="persona" data-alias="alice" data-target="/demo">
+        Alice Example<br><small style="font-weight: 400;">Customer &middot; ask the assistant</small>
+      </button>
+      <button type="button" class="persona secondary" data-alias="bob" data-target="/demo">
+        Bob Example<br><small style="font-weight: 400;">Customer &middot; ask the assistant</small>
+      </button>
+      <button type="button" class="persona secondary" data-alias="reviewer" data-target="/review/escalations">
+        Riley Reviewer<br><small style="font-weight: 400;">Human-in-the-loop queue</small>
+      </button>
+      <button type="button" class="persona secondary" data-alias="compliance" data-target="/review/escalations">
+        Casey Compliance<br><small style="font-weight: 400;">Human-in-the-loop queue</small>
+      </button>
+    </div>
+    <p id="persona-error" role="alert" aria-live="assertive" style="color: var(--high); display: none; margin-bottom: 0;"></p>
+  </div>
+  {% else %}
+  <div class="card">
+    <h2>Local demo disabled</h2>
+    <p style="margin-bottom: 0;">
+      Passwordless synthetic personas are available only in the local/test
+      demo profile. Non-local environments require the configured identity
+      provider and do not expose this sign-in shortcut.
+    </p>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <h2>What this demonstrates</h2>
+    <ul class="plain">
+      <li><strong>Deterministic risk boundary</strong> &mdash; LOW/MEDIUM/HIGH classification runs in plain code, not a prompt; a model can improve wording but cannot lower risk, widen access, or change the outcome.</li>
+      <li><strong>Authorization &amp; isolation</strong> &mdash; every account lookup is re-verified against the signed-in actor; cross-customer access fails closed.</li>
+      <li><strong>Privacy redaction</strong> &mdash; submitted passwords, PINs, and card numbers are stripped before storage or reasoning, and the request still escalates.</li>
+      <li><strong>Human escalation</strong> &mdash; credit, fraud, hardship, legal, and unclear requests always route to a reviewer queue with acknowledge / route / close actions.</li>
+      <li><strong>Cited, evidenced answers</strong> &mdash; every factual claim carries a source citation; unsupported claims fail closed instead of guessing.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Under the hood</h2>
+    <p style="color: var(--muted); font-size: .9rem;">
+      Python 3.12 &middot; FastAPI &middot; PostgreSQL 16 &middot; deterministic
+      control flow &middot; 96 automated tests &middot; 11 blocking CI gates
+      (lint, strict typing, unit/integration/policy tests, container smoke,
+      dependency/secret/static/image scans) &middot; SBOM and build-provenance
+      attestations on every release candidate.
+    </p>
+    <p style="margin-bottom: 0;">
+      <a class="button secondary" href="https://github.com/ozzy2438/responsible-ai-banking-agent">View source &amp; CI evidence on GitHub</a>
+    </p>
+  </div>
+{% endblock %}
+{% block scripts %}
+  {% if demo_enabled %}
+  <script src="/static/landing.js" defer></script>
+  {% endif %}
+{% endblock %}

@@ -1,6 +1,6 @@
 PYTHON := .venv/bin/python
 
-.PHONY: setup identities db-up migrate serve lint typecheck test db-down
+.PHONY: setup identities db-up migrate serve lint typecheck test db-down regenerate-synthetic-seed
 
 setup:
 	python3.12 -m venv .venv
@@ -30,3 +30,6 @@ test:
 
 db-down:
 	docker compose down
+
+regenerate-synthetic-seed:
+	$(PYTHON) scripts/generate_synthetic_seed.py > migrations/0003_synthetic_seed_data.sql

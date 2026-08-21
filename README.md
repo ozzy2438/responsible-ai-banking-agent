@@ -41,7 +41,8 @@ but it cannot lower risk, widen access, choose tools, or change disposition.
 - PostgreSQL 16 with separate migration and restricted application roles
 - synthetic fixtures and versioned policy documents
 - Docker and GitHub Actions
-- private GHCR pre-release images with provenance and SBOM attestations
+- public GHCR release-candidate images with provenance and SBOM attestations;
+  no production image or `latest` tag
 
 ## Run locally
 
@@ -85,7 +86,11 @@ See [the system card](docs/system-card.md),
 [architecture](docs/architecture.md), and
 [threat model](docs/threat-model.md) for the controlled scope. See
 [delivery controls](docs/delivery.md) for CI jobs, RC publication, SBOM, and
-attestation verification.
+attestation verification. See the
+[production readiness roadmap](docs/production-readiness-roadmap.md) for what
+remains between this reference candidate and any real deployment, and
+[synthetic data](docs/synthetic-data.md) for the bulk seed dataset used for
+local development, demos, and stress testing.
 
 ## Evidence language
 

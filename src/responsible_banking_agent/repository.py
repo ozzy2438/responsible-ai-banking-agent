@@ -19,6 +19,8 @@ class AccountRecord:
     currency: str
     available_balance: str
     updated_at: datetime
+    source_system: str = "synthetic-postgres"
+    source_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class TransactionRecord:
     currency: str
     booked_at: datetime
     updated_at: datetime
+    source_system: str = "synthetic-postgres"
+    source_version: str | None = None
 
 
 class BankingRepository(Protocol):

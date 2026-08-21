@@ -1,8 +1,9 @@
 import json
 import os
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
+import psycopg
 import pytest
 
 from responsible_banking_agent.config import Settings
@@ -58,9 +59,22 @@ def test_scenario_matches_expected_risk_and_disposition(case: dict) -> None:
 
     actor = Actor(actor_id=UUID(case["actor_id"]), role=Role.CUSTOMER, display_name="Synthetic")
     account_id = UUID(case["account_id"]) if case.get("account_id") else None
+    if account_id and case["expected_risk"] == "MEDIUM":
+        with psycopg.connect(settings.migration_database_url) as connection:
+            connection.execute(
+                "UPDATE accounts SET updated_at = now() WHERE id = %s", (account_id,)
+            )
+            connection.execute(
+                "UPDATE transactions SET updated_at = now() WHERE account_id = %s",
+                (account_id,),
+            )
     request = AssistRequest(message=case["message"], account_id=account_id)
 
-    response = service.assist(actor, request, idempotency_key=f"synthetic-scenario-{case['id']}")
+    response = service.assist(
+        actor,
+        request,
+        idempotency_key=f"synthetic-scenario-{case['id']}-{uuid4()}",
+    )
 
     assert response.risk_level.value == case["expected_risk"], case["id"]
     assert response.disposition.value == case["expected_disposition"], case["id"]

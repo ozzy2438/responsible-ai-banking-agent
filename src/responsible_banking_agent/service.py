@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
+from .bank_data import BankDataError, BankDataProvider
 from .models import (
     Actor,
     AssistRequest,
@@ -25,11 +26,16 @@ from .validation import ResponseValidationError, validate_draft
 
 class BankingService:
     def __init__(
-        self, repository: BankingRepository, policies: PolicyStore, provider: ReasoningProvider
+        self,
+        repository: BankingRepository,
+        policies: PolicyStore,
+        provider: ReasoningProvider,
+        data_provider: BankDataProvider | None = None,
     ) -> None:
         self.repository = repository
         self.policies = policies
         self.provider = provider
+        self.data_provider = data_provider or repository
         self.fallback = DeterministicStub()
 
     def assist(self, actor: Actor, request: AssistRequest, idempotency_key: str) -> AssistResponse:
@@ -39,15 +45,28 @@ class BankingService:
         if assessment.level is RiskLevel.LOW:
             facts = self.policies.lookup(redaction.text)
         elif assessment.level is RiskLevel.MEDIUM and request.account_id:
-            account = self.repository.get_authorized_account(actor.actor_id, request.account_id)
-            if account is None:
+            try:
+                account = self.data_provider.get_authorized_account(
+                    actor.actor_id, request.account_id
+                )
+            except BankDataError:
+                account = None
                 assessment = assessment.model_copy(
                     update={
                         "level": RiskLevel.HIGH,
-                        "reason_codes": ["identity_or_account_scope_conflict"],
+                        "reason_codes": ["approved_evidence_unavailable_or_conflicting"],
                         "route": EscalationRoute.CUSTOMER_SERVICE,
                     }
                 )
+            if account is None:
+                if assessment.level is not RiskLevel.HIGH:
+                    assessment = assessment.model_copy(
+                        update={
+                            "level": RiskLevel.HIGH,
+                            "reason_codes": ["identity_or_account_scope_conflict"],
+                            "route": EscalationRoute.CUSTOMER_SERVICE,
+                        }
+                    )
             elif datetime.now(UTC) - account.updated_at > timedelta(hours=24):
                 assessment = assessment.model_copy(
                     update={
@@ -60,8 +79,8 @@ class BankingService:
                 citation = Citation(
                     source_type="account",
                     source_id=str(account.account_id),
-                    version=account.updated_at.isoformat(),
-                    section="authorised-summary",
+                    version=account.source_version or account.updated_at.isoformat(),
+                    section=f"{account.source_system}:authorised-summary",
                 )
                 facts = [
                     VerifiedFact(label="Account", value=account.account_name, citation=citation),
@@ -72,14 +91,27 @@ class BankingService:
                     ),
                 ]
                 if "transaction" in redaction.text.lower():
-                    for transaction in self.repository.get_authorized_transactions(
-                        actor.actor_id, request.account_id
-                    ):
+                    try:
+                        transactions = self.data_provider.get_authorized_transactions(
+                            actor.actor_id, request.account_id
+                        )
+                    except BankDataError:
+                        transactions = []
+                        assessment = assessment.model_copy(
+                            update={
+                                "level": RiskLevel.HIGH,
+                                "reason_codes": ["approved_evidence_unavailable_or_conflicting"],
+                                "route": EscalationRoute.CUSTOMER_SERVICE,
+                            }
+                        )
+                    for transaction in transactions:
                         transaction_citation = Citation(
                             source_type="transaction",
                             source_id=str(transaction.transaction_id),
-                            version=transaction.updated_at.isoformat(),
-                            section="authorised-transaction",
+                            version=(
+                                transaction.source_version or transaction.updated_at.isoformat()
+                            ),
+                            section=f"{transaction.source_system}:authorised-transaction",
                         )
                         facts.append(
                             VerifiedFact(

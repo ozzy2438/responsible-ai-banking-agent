@@ -9,6 +9,7 @@ from responsible_banking_agent.api import create_app
 from responsible_banking_agent.config import Settings
 from responsible_banking_agent.identity import IdentityStore
 from responsible_banking_agent.models import AssistResponse, EscalationRoute
+from responsible_banking_agent.rate_limit import InMemoryRateLimiter, RateLimiter
 from responsible_banking_agent.repository import AccountRecord, TransactionRecord
 
 ALICE_ID = UUID("11111111-1111-4111-8111-111111111111")
@@ -112,7 +113,12 @@ def _identities() -> IdentityStore:
     )
 
 
-def _client(repository: FakeRepository | None = None) -> tuple[TestClient, FakeRepository]:
+def _client(
+    repository: FakeRepository | None = None,
+    *,
+    rate_limiter: RateLimiter | None = None,
+    max_request_body_bytes: int = 16_384,
+) -> tuple[TestClient, FakeRepository]:
     repository = repository or FakeRepository()
     settings = Settings(
         app_env="test",
@@ -126,8 +132,19 @@ def _client(repository: FakeRepository | None = None) -> tuple[TestClient, FakeR
         openai_api_key=None,
         openai_model=None,
         session_cookie_secure=False,
+        max_request_body_bytes=max_request_body_bytes,
     )
-    return TestClient(create_app(settings, repository, _identities())), repository
+    return (
+        TestClient(
+            create_app(
+                settings,
+                repository,
+                _identities(),
+                rate_limiter=rate_limiter,
+            )
+        ),
+        repository,
+    )
 
 
 def test_authentication_idempotency_isolation_and_security_headers() -> None:
@@ -212,3 +229,50 @@ def test_health_readiness_and_validation_failures() -> None:
         json={"action": "route", "reason": "Route this case"},
     )
     assert route_without_target.status_code == 422
+
+    validation_secret = "must-not-be-echoed-123"
+    invalid = client.post(
+        "/v1/assist",
+        headers={"Authorization": "Bearer alice-test-token", "Idempotency-Key": "invalid-1"},
+        json={"message": 123, "unexpected": validation_secret},
+    )
+    assert invalid.status_code == 422
+    assert validation_secret not in invalid.text
+
+
+def test_request_boundary_enforces_ids_hosts_body_limits_and_rate_limits() -> None:
+    limiter = InMemoryRateLimiter(requests=2, window_seconds=60, clock=lambda: 100.0)
+    client, _ = _client(rate_limiter=limiter, max_request_body_bytes=4096)
+    headers = {"Authorization": "Bearer alice-test-token", "Idempotency-Key": "rate-key-1"}
+
+    first = client.post(
+        "/v1/assist",
+        headers={**headers, "X-Request-ID": "not-a-uuid"},
+        json={"message": "What are branch opening hours?"},
+    )
+    second = client.post(
+        "/v1/assist",
+        headers={**headers, "Idempotency-Key": "rate-key-2"},
+        json={"message": "What are branch opening hours?"},
+    )
+    limited = client.post(
+        "/v1/assist",
+        headers={**headers, "Idempotency-Key": "rate-key-3"},
+        json={"message": "What are branch opening hours?"},
+    )
+    assert first.status_code == 200
+    UUID(first.headers["X-Request-ID"])
+    assert second.status_code == 200
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"] == "60"
+
+    oversized_client, _ = _client(max_request_body_bytes=4096)
+    oversized = oversized_client.post(
+        "/v1/assist",
+        headers=headers,
+        json={"message": "x" * 5000},
+    )
+    assert oversized.status_code == 413
+
+    invalid_host = oversized_client.get("/healthz", headers={"Host": "evil.example"})
+    assert invalid_host.status_code == 400

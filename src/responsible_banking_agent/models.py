@@ -43,6 +43,10 @@ class Actor(StrictModel):
     actor_id: UUID
     role: Role
     display_name: str = Field(min_length=1, max_length=100)
+    authentication_method: Literal["simulated", "oidc"] = "simulated"
+    assurance_level: str | None = Field(default=None, max_length=200)
+    authentication_methods: list[str] = Field(default_factory=list, max_length=10)
+    authorization_scopes: list[str] = Field(default_factory=list, max_length=20)
 
 
 class AssistRequest(StrictModel):

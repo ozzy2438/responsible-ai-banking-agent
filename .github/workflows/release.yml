@@ -47,7 +47,7 @@ jobs:
           python -m pip install .
           api_version="$(python -c 'from responsible_banking_agent.version import __version__; print(__version__)')"
           test "$api_version" = "$EXPECTED_VERSION"
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Log in to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
